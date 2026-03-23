@@ -1,0 +1,54 @@
+{
+  "expo": {
+    "name": "Paddle",
+    "slug": "kayak-planner",
+    "version": "1.0.0",
+    "orientation": "portrait",
+    "icon": "./assets/icon.png",
+    "userInterfaceStyle": "light",
+    "splash": {
+      "image": "./assets/splash-icon.png",
+      "resizeMode": "contain",
+      "backgroundColor": "#f2f1ed"
+    },
+    "ios": {
+      "supportsTablet": false,
+      "bundleIdentifier": "com.paddle.kayakplanner",
+      "infoPlist": {
+        "NSLocationWhenInUseUsageDescription": "Paddle needs your location to fetch local weather and track your route.",
+        "NSLocationAlwaysAndWhenInUseUsageDescription": "Paddle uses your location to track your paddle and monitor safety."
+      }
+    },
+    "android": {
+      "adaptiveIcon": {
+        "foregroundImage": "./assets/adaptive-icon.png",
+        "backgroundColor": "#f2f1ed"
+      },
+      "package": "com.paddle.kayakplanner",
+      "permissions": [
+        "ACCESS_FINE_LOCATION",
+        "ACCESS_COARSE_LOCATION",
+        "ACCESS_BACKGROUND_LOCATION"
+      ]
+    },
+    "web": {
+      "bundler": "metro",
+      "output": "single",
+      "favicon": "./assets/favicon.png"
+    },
+    "plugins": [
+      [
+        "expo-location",
+        {
+          "locationAlwaysAndWhenInUsePermission": "Paddle uses your location to track your route and provide real-time safety alerts."
+        }
+      ],
+      "expo-web-browser"
+    ],
+    "extra": {
+      "stravaClientId": "",
+      "stravaClientSecret": "",
+      "ridbApiKey": ""
+    }
+  }
+}

@@ -1,0 +1,196 @@
+/**
+ * storageService — local-first storage with background API sync.
+ *
+ * Strategy:
+ *  - All writes go to AsyncStorage immediately (works offline)
+ *  - After each write, we attempt to sync to the server in the background
+ *  - Reads always come from AsyncStorage first; API is used for initial load
+ */
+import AsyncStorage from '@react-native-async-storage/async-storage';
+import api from './api';
+
+const KEYS = {
+  ACTIVE_TRIP:  'PADDLE_ACTIVE_TRIP',
+  HISTORY:      'PADDLE_HISTORY',
+  WEATHER:      'PADDLE_WEATHER_CACHE',
+  SETTINGS:     'PADDLE_SETTINGS',
+  PADDLE_LOG:   'PADDLE_ACTIVE_LOG',
+  PROFILE:      'PADDLE_PROFILE',
+};
+
+// ── Active trip (in-progress paddle) ─────────────────────────────────────────
+
+export async function saveActiveTrip(trip) {
+  await AsyncStorage.setItem(KEYS.ACTIVE_TRIP, JSON.stringify({ ...trip, savedAt: Date.now() }));
+  // Best-effort server sync — create or update the trip record
+  try {
+    if (trip.serverId) {
+      await api.trips.update(trip.serverId, { status: 'active', route_data: trip.route });
+    } else {
+      const saved = await api.trips.create({
+        trip_type:        trip.tripType?.id || 'day_paddle',
+        skill_level:      trip.skillLevel?.key || 'intermediate',
+        location_name:    trip.location?.name,
+        location_lat:     trip.location?.lat,
+        location_lon:     trip.location?.lon,
+        planned_date:     new Date().toISOString().split('T')[0],
+        duration_days:    trip.tripType?.days || 1,
+        route_data:       trip.route,
+        weather_snapshot: trip.weather?.current,
+      });
+      // Store server ID locally for future updates
+      const updated = { ...trip, serverId: saved.id, savedAt: Date.now() };
+      await AsyncStorage.setItem(KEYS.ACTIVE_TRIP, JSON.stringify(updated));
+    }
+  } catch (_) {
+    // Offline — will sync on next opportunity
+  }
+}
+
+export async function getActiveTrip() {
+  const raw = await AsyncStorage.getItem(KEYS.ACTIVE_TRIP);
+  return raw ? JSON.parse(raw) : null;
+}
+
+export async function clearActiveTrip() {
+  await AsyncStorage.removeItem(KEYS.ACTIVE_TRIP);
+  await AsyncStorage.removeItem(KEYS.PADDLE_LOG);
+}
+
+// ── GPS log (written frequently during paddle) ────────────────────────────────
+
+export async function addPaddleLogEntry(entry) {
+  const raw = await AsyncStorage.getItem(KEYS.PADDLE_LOG);
+  const log = raw ? JSON.parse(raw) : [];
+  log.push({ ...entry, ts: Date.now() });
+  await AsyncStorage.setItem(KEYS.PADDLE_LOG, JSON.stringify(log.slice(-2000)));
+}
+
+export async function getPaddleLog() {
+  const raw = await AsyncStorage.getItem(KEYS.PADDLE_LOG);
+  return raw ? JSON.parse(raw) : [];
+}
+
+// ── History (completed paddles) ───────────────────────────────────────────────
+
+export async function saveToHistory(completedTrip) {
+  // 1. Save locally
+  const raw = await AsyncStorage.getItem(KEYS.HISTORY);
+  const history = raw ? JSON.parse(raw) : [];
+  history.unshift({ ...completedTrip, completedAt: Date.now() });
+  await AsyncStorage.setItem(KEYS.HISTORY, JSON.stringify(history.slice(0, 100)));
+
+  // 2. Push to server
+  try {
+    const gpsTrack   = await getPaddleLog();
+    const paddle = await api.paddles.create({
+      trip_id:          completedTrip.serverId || null,
+      started_at:       new Date(completedTrip.startedAt).toISOString(),
+      finished_at:      new Date().toISOString(),
+      distance_km:      completedTrip.distancePaddled,
+      duration_seconds: completedTrip.durationSeconds,
+      avg_speed_knots:  completedTrip.avgSpeed,
+      max_speed_knots:  completedTrip.maxSpeed,
+      gps_track:        gpsTrack,
+      weather_log:      completedTrip.weatherLog || [],
+      notes:            completedTrip.notes,
+    });
+
+    // Mark trip as completed on server
+    if (completedTrip.serverId) {
+      await api.trips.update(completedTrip.serverId, { status: 'completed' });
+    }
+  } catch (_) {
+    // Offline — history is safe locally, will sync next time
+  }
+}
+
+export async function getHistory() {
+  // Try to get fresh data from server, fall back to local cache
+  try {
+    const paddles = await api.paddles.list();
+    // Normalise server format to match what screens expect
+    const normalised = paddles.map(p => ({
+      id:               p.id,
+      serverId:         p.id,
+      distancePaddled:  p.distance_km,
+      durationSeconds:  p.duration_seconds,
+      completedAt:      new Date(p.finished_at || p.created_at).getTime(),
+      route:            p.trips?.route_data,
+      skillLevel:       { label: 'Intermediate' },
+      tripType:         { label: p.trips?.trip_type || 'Day trip' },
+      weather:          { current: p.weather_log?.[0] },
+      location:         p.trips?.location_name,
+    }));
+    // Also update local cache
+    await AsyncStorage.setItem(KEYS.HISTORY, JSON.stringify(normalised));
+    return normalised;
+  } catch (_) {
+    // Offline — return local cache
+    const raw = await AsyncStorage.getItem(KEYS.HISTORY);
+    return raw ? JSON.parse(raw) : [];
+  }
+}
+
+export async function getPaddleStats() {
+  try {
+    return await api.paddles.stats();
+  } catch (_) {
+    // Compute locally
+    const history = await getHistory();
+    return {
+      count:       history.length,
+      total_km:    +history.reduce((s, t) => s + (t.distancePaddled || 0), 0).toFixed(2),
+      total_hours: +(history.reduce((s, t) => s + (t.durationSeconds || 0), 0) / 3600).toFixed(1),
+    };
+  }
+}
+
+// ── User profile ──────────────────────────────────────────────────────────────
+
+export async function getProfile() {
+  try {
+    const profile = await api.users.me();
+    await AsyncStorage.setItem(KEYS.PROFILE, JSON.stringify(profile));
+    return profile;
+  } catch (_) {
+    const raw = await AsyncStorage.getItem(KEYS.PROFILE);
+    return raw ? JSON.parse(raw) : null;
+  }
+}
+
+export async function updateProfile(updates) {
+  const updated = await api.users.update(updates);
+  await AsyncStorage.setItem(KEYS.PROFILE, JSON.stringify(updated));
+  return updated;
+}
+
+// ── Settings ──────────────────────────────────────────────────────────────────
+
+export async function getSettings() {
+  const raw = await AsyncStorage.getItem(KEYS.SETTINGS);
+  return raw ? JSON.parse(raw) : {
+    units:         'metric',
+    tempUnit:      'celsius',
+    notifications: true,
+  };
+}
+
+export async function saveSettings(settings) {
+  await AsyncStorage.setItem(KEYS.SETTINGS, JSON.stringify(settings));
+}
+
+// ── Weather cache ─────────────────────────────────────────────────────────────
+
+export async function getCachedWeather(lat, lon) {
+  const raw = await AsyncStorage.getItem(KEYS.WEATHER);
+  if (!raw) return null;
+  const { data, lat: cLat, lon: cLon, ts } = JSON.parse(raw);
+  const stale = Date.now() - ts > 3 * 60 * 60 * 1000; // 3 hours
+  const nearby = Math.abs(cLat - lat) < 0.1 && Math.abs(cLon - lon) < 0.1;
+  return (!stale && nearby) ? { ...data, fromCache: true, cacheAge: Date.now() - ts } : null;
+}
+
+export async function saveWeatherCache(lat, lon, data) {
+  await AsyncStorage.setItem(KEYS.WEATHER, JSON.stringify({ lat, lon, data, ts: Date.now() }));
+}

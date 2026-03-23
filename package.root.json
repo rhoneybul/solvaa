@@ -1,0 +1,12 @@
+{
+  "name": "paddle-monorepo",
+  "version": "1.0.0",
+  "private": true,
+  "scripts": {
+    "dev": "npm run dev:server & npm run dev:app",
+    "dev:app": "cd app && npx expo start",
+    "dev:server": "cd server && npm run dev",
+    "install:all": "npm install && cd server && npm install",
+    "setup": "npm run install:all && cp -n server/.env.example server/.env || true"
+  }
+}
