@@ -7,6 +7,7 @@ const paddlesRouter  = require('./routes/paddles');
 const campsitesRouter = require('./routes/campsites');
 const weatherRouter  = require('./routes/weather');
 const usersRouter    = require('./routes/users');
+const planningRouter = require('./routes/planning');
 
 const { authMiddleware } = require('./middleware/auth');
 
@@ -14,7 +15,8 @@ const app  = express();
 const PORT = process.env.PORT || 3001;
 
 // ── Middleware ────────────────────────────────────────────────────────────────
-app.use(cors({ origin: process.env.ALLOWED_ORIGINS?.split(',') || '*' }));
+const allowedOrigins = process.env.ALLOWED_ORIGINS;
+app.use(cors({ origin: !allowedOrigins || allowedOrigins === '*' ? '*' : allowedOrigins.split(',') }));
 app.use(express.json());
 
 // ── Health check (no auth needed) ────────────────────────────────────────────
@@ -28,6 +30,7 @@ app.use('/api/trips',     authMiddleware, tripsRouter);
 app.use('/api/paddles',   authMiddleware, paddlesRouter);
 app.use('/api/campsites', campsitesRouter);  // public — no auth needed
 app.use('/api/weather',   weatherRouter);    // public — proxies Open-Meteo
+app.use('/api/planning',  planningRouter);   // public — plans paddles via Claude
 
 // ── Error handler ─────────────────────────────────────────────────────────────
 app.use((err, _req, res, _next) => {

@@ -30,13 +30,10 @@
 import { SKILL_LEVELS } from './stravaService';
 import { getWeatherWithCache } from './weatherService';
 
-const CLAUDE_API_KEY = process.env.EXPO_PUBLIC_CLAUDE_API_KEY || '';
 
 /** Default request timeout in ms (30 seconds). */
 const REQUEST_TIMEOUT_MS = 30000;
 
-/** Maximum number of retries on timeout or malformed JSON. */
-const MAX_RETRIES = 2;
 
 // ── Skill-level description block used inside the system prompt ──────────────
 const SKILL_LEVEL_CONTEXT = Object.values(SKILL_LEVELS)
@@ -125,71 +122,6 @@ IMPORTANT:
 - If Bristol, suggest Pembrokeshire, Gower Peninsula, River Wye.
 - Give genuinely useful, accurate local knowledge.`;
 
-// ── Legacy system prompt (unchanged) ─────────────────────────────────────────
-const SYSTEM_PROMPT = `You are a kayaking trip planner assistant built into the Paddle app.
-
-When a user describes a paddle they want to do, extract and respond with a structured JSON plan. Parse natural language like:
-- Location (explicit or implied)
-- Duration (hours, days, weekend, week)
-- Trip type (day paddle, multi-day, camping)
-- Access (own transport, car, public transport)
-- Skill level if mentioned
-- Any preferences (coastal, river, lake, sheltered, challenging)
-
-Respond ONLY with a valid JSON object (no markdown, no backticks, no preamble) in this exact structure:
-{
-  "understood": "One sentence confirming what you understood",
-  "location": {
-    "base": "City/town they are in or near",
-    "searchRadius": "how far they can travel in km as a number",
-    "transport": "own car | public transport | unknown"
-  },
-  "trip": {
-    "type": "day_paddle | weekend | week | multi_day",
-    "durationHours": number or null,
-    "durationDays": number or null,
-    "paddlingHoursPerDay": number
-  },
-  "conditions": {
-    "skillLevel": "beginner | intermediate | advanced | unknown",
-    "terrainPreference": "coastal | river | lake | any",
-    "sheltered": true or false
-  },
-  "routes": [
-    {
-      "name": "Route name",
-      "location": "Specific place name",
-      "distanceKm": number,
-      "durationHours": number,
-      "terrain": "coastal | river | lake | estuary",
-      "difficulty": "easy | moderate | challenging",
-      "why": "One sentence why this suits them",
-      "travelFromBase": "How to get there",
-      "travelTimeMin": number,
-      "highlights": ["highlight 1", "highlight 2"],
-      "launchPoint": "Specific beach/slipway/put-in name",
-      "bestConditions": "Wind/tide advice specific to this spot"
-    }
-  ],
-  "campsites": [
-    {
-      "name": "Campsite name",
-      "nearRoute": "Route name it is near",
-      "distanceFromWaterKm": number,
-      "type": "beach | formal | wild",
-      "notes": "Brief useful note"
-    }
-  ],
-  "weatherNote": "General seasonal weather note for the area and time of year",
-  "packingHighlights": ["item 1", "item 2", "item 3", "item 4", "item 5"],
-  "safetyNote": "One specific safety note relevant to these routes"
-}
-
-Be specific with real place names. If in the UK, suggest real UK paddling spots.
-If they mention Axminster, suggest the River Axe estuary, Lyme Bay, Seaton.
-If they mention London with a car, suggest Chichester Harbour, Norfolk Broads, River Wye, Lyme Regis.
-If Bristol, suggest Pembrokeshire, Gower Peninsula, River Wye.
-Give genuinely useful, accurate local knowledge.`;
 
 // ── Helpers ──────────────────────────────────────────────────────────────────
 
@@ -223,21 +155,6 @@ function fetchWithTimeout(url, opts, timeoutMs = REQUEST_TIMEOUT_MS) {
         }
       });
   });
-}
-
-/**
- * Strip markdown fences and leading/trailing whitespace, then parse JSON.
- * Throws a descriptive error when the text is not valid JSON.
- * @param {string} raw
- * @returns {Object}
- */
-function safeParseJSON(raw) {
-  const cleaned = raw.replace(/```json|```/g, '').trim();
-  try {
-    return JSON.parse(cleaned);
-  } catch {
-    throw new Error('MALFORMED_JSON');
-  }
 }
 
 /**
@@ -285,72 +202,13 @@ function buildWeatherContext(weather) {
   return lines.join('\n');
 }
 
-// ── Core API call with retry ─────────────────────────────────────────────────
-
-/**
- * Calls the Claude messages API and returns the parsed JSON response.
- * Retries up to MAX_RETRIES times on timeout or malformed JSON.
- *
- * @param {string} systemPrompt
- * @param {string} userContent
- * @param {number} maxTokens
- * @returns {Promise<Object>}
- */
-async function callClaudeWithRetry(systemPrompt, userContent, maxTokens = 2500) {
-  let lastError = null;
-
-  for (let attempt = 0; attempt <= MAX_RETRIES; attempt++) {
-    try {
-      const response = await fetchWithTimeout('https://api.anthropic.com/v1/messages', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'x-api-key': CLAUDE_API_KEY,
-          'anthropic-version': '2023-06-01',
-        },
-        body: JSON.stringify({
-          model: 'claude-sonnet-4-20250514',
-          max_tokens: maxTokens,
-          system: systemPrompt,
-          messages: [{ role: 'user', content: userContent }],
-        }),
-      });
-
-      if (!response.ok) {
-        const err = await response.json().catch(() => ({}));
-        throw new Error(err?.error?.message || `API error ${response.status}`);
-      }
-
-      const data = await response.json();
-      const text = data.content?.[0]?.text || '';
-      return safeParseJSON(text);
-    } catch (e) {
-      lastError = e;
-      // Only retry on timeout or malformed JSON
-      const isRetryable =
-        e.message === 'MALFORMED_JSON' ||
-        e.message.includes('timed out');
-      if (!isRetryable || attempt === MAX_RETRIES) break;
-      // Brief back-off before retrying
-      await new Promise((r) => setTimeout(r, 1000 * (attempt + 1)));
-    }
-  }
-
-  // Provide a friendly message for the final error
-  if (lastError?.message === 'MALFORMED_JSON') {
-    throw new Error('Could not parse trip plan. The AI returned an unexpected format — please try again.');
-  }
-  throw lastError;
-}
-
 // ── Public API ───────────────────────────────────────────────────────────────
 
 /**
  * Check whether a usable API key is configured.
  * @returns {boolean}
  */
-export const hasApiKey = () =>
-  !!CLAUDE_API_KEY && CLAUDE_API_KEY !== 'sk-ant-your-key-here';
+export const hasApiKey = () => true; // key is validated server-side
 
 /**
  * Legacy: Plan a paddle trip from a natural-language prompt (no weather bridge).
@@ -358,10 +216,16 @@ export const hasApiKey = () =>
  * @returns {Promise<Object>}
  */
 export async function planPaddle(userPrompt) {
-  if (!CLAUDE_API_KEY || CLAUDE_API_KEY === 'sk-ant-your-key-here') {
-    throw new Error('CLAUDE_API_KEY not set. Add EXPO_PUBLIC_CLAUDE_API_KEY to your .env file.');
+  const response = await fetchWithTimeout(`${BASE_URL}/api/planning`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ prompt: userPrompt }),
+  });
+  if (!response.ok) {
+    const err = await response.json().catch(() => ({}));
+    throw new Error(err?.error || `Planning API error ${response.status}`);
   }
-  return callClaudeWithRetry(SYSTEM_PROMPT, userPrompt, 1500);
+  return response.json();
 }
 
 /**
@@ -388,10 +252,6 @@ export async function planPaddleWithWeather({
   interests,
   location,
 } = {}) {
-  if (!CLAUDE_API_KEY || CLAUDE_API_KEY === 'sk-ant-your-key-here') {
-    throw new Error('CLAUDE_API_KEY not set. Add EXPO_PUBLIC_CLAUDE_API_KEY to your .env file.');
-  }
-
   // Resolve coordinates — prefer explicit location, fall back to lat/lon
   const resolvedLat = location?.lat != null ? location.lat : lat;
   const resolvedLon = location?.lng != null ? location.lng : lon;
@@ -450,8 +310,17 @@ export async function planPaddleWithWeather({
 
   const userMessage = parts.join('\n');
 
-  // ── 3. Call Claude with retry ─────────────────────────────────────────────
-  const plan = await callClaudeWithRetry(SYSTEM_PROMPT_THREE_ROUTES, userMessage, 3000);
+  // ── 3. Call backend planning API (avoids CORS hitting Anthropic directly) ───
+  const response = await fetchWithTimeout(`${BASE_URL}/api/planning`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ systemPrompt: SYSTEM_PROMPT_THREE_ROUTES, userMessage }),
+  });
+  if (!response.ok) {
+    const err = await response.json().catch(() => ({}));
+    throw new Error(err?.error || `Planning API error ${response.status}`);
+  }
+  const plan = await response.json();
 
   // ── 4. Validate route count — pad or trim to exactly 3 ───────────────────
   if (!Array.isArray(plan.routes)) {

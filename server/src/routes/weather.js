@@ -21,10 +21,10 @@ router.get('/', async (req, res, next) => {
     const url =
       `https://api.open-meteo.com/v1/forecast` +
       `?latitude=${lat}&longitude=${lon}` +
-      `&current=temperature_2m,windspeed_10m,winddirection_10m,weathercode,precipitation,wave_height` +
-      `&hourly=temperature_2m,windspeed_10m,precipitation_probability,weathercode,wave_height` +
+      `&current=temperature_2m,windspeed_10m,winddirection_10m,weathercode,precipitation` +
+      `&hourly=temperature_2m,windspeed_10m,precipitation_probability,weathercode` +
       `&daily=weathercode,temperature_2m_max,temperature_2m_min,windspeed_10m_max,sunrise,sunset,precipitation_sum` +
-      `&forecast_days=3&timezone=auto&windspeed_unit=knots`;
+      `&forecast_days=3&timezone=auto&windspeed_unit=kn`;
 
     const resp = await fetch(url);
     if (!resp.ok) throw new Error(`Open-Meteo error: ${resp.status}`);
