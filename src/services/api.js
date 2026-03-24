@@ -8,16 +8,13 @@
  * server can verify who's calling.
  */
 
-import AsyncStorage from '@react-native-async-storage/async-storage';
+import { getSession } from './authService';
 
 const BASE_URL = process.env.EXPO_PUBLIC_API_URL || 'http://localhost:3001';
 
 async function getToken() {
-  // Supabase stores the session in AsyncStorage under this key
-  const raw = await AsyncStorage.getItem('supabase.auth.token');
-  if (!raw) return null;
   try {
-    const session = JSON.parse(raw);
+    const session = await getSession();
     return session?.access_token || null;
   } catch {
     return null;

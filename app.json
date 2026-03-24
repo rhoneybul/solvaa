@@ -2,6 +2,7 @@
   "expo": {
     "name": "Paddle",
     "slug": "kayak-planner",
+    "scheme": "paddle",
     "version": "1.0.0",
     "orientation": "portrait",
     "icon": "./assets/icon.png",
@@ -16,7 +17,8 @@
       "bundleIdentifier": "com.paddle.kayakplanner",
       "infoPlist": {
         "NSLocationWhenInUseUsageDescription": "Paddle needs your location to fetch local weather and track your route.",
-        "NSLocationAlwaysAndWhenInUseUsageDescription": "Paddle uses your location to track your paddle and monitor safety."
+        "NSLocationAlwaysAndWhenInUseUsageDescription": "Paddle uses your location to track your paddle and monitor safety.",
+        "ITSAppUsesNonExemptEncryption": false
       }
     },
     "android": {
@@ -28,7 +30,9 @@
       "permissions": [
         "ACCESS_FINE_LOCATION",
         "ACCESS_COARSE_LOCATION",
-        "ACCESS_BACKGROUND_LOCATION"
+        "ACCESS_BACKGROUND_LOCATION",
+        "android.permission.ACCESS_COARSE_LOCATION",
+        "android.permission.ACCESS_FINE_LOCATION"
       ]
     },
     "web": {
@@ -49,7 +53,10 @@
     "extra": {
       "stravaClientId": "",
       "stravaClientSecret": "",
-      "ridbApiKey": ""
+      "ridbApiKey": "",
+      "eas": {
+        "projectId": "6899eeb2-0873-48c1-bcd6-ea2da41466fb"
+      }
     }
   }
 }

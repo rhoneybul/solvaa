@@ -24,17 +24,41 @@ insert into storage.buckets (id, name, public)
   on conflict (id) do nothing;
 
 -- Allow authenticated users to upload their own GPX files
-create policy if not exists "Authenticated users can upload GPX"
-  on storage.objects for insert
-  to authenticated
-  with check (bucket_id = 'gpx-routes' AND (storage.foldername(name))[1] = auth.uid()::text);
+do $$ begin
+  if not exists (
+    select 1 from pg_policies
+    where schemaname = 'storage' and tablename = 'objects'
+    and policyname = 'Authenticated users can upload GPX'
+  ) then
+    create policy "Authenticated users can upload GPX"
+      on storage.objects for insert
+      to authenticated
+      with check (bucket_id = 'gpx-routes' AND (storage.foldername(name))[1] = auth.uid()::text);
+  end if;
+end $$;
 
-create policy if not exists "GPX files are publicly readable"
-  on storage.objects for select
-  to public
-  using (bucket_id = 'gpx-routes');
+do $$ begin
+  if not exists (
+    select 1 from pg_policies
+    where schemaname = 'storage' and tablename = 'objects'
+    and policyname = 'GPX files are publicly readable'
+  ) then
+    create policy "GPX files are publicly readable"
+      on storage.objects for select
+      to public
+      using (bucket_id = 'gpx-routes');
+  end if;
+end $$;
 
-create policy if not exists "Users can delete own GPX files"
-  on storage.objects for delete
-  to authenticated
-  using (bucket_id = 'gpx-routes' AND (storage.foldername(name))[1] = auth.uid()::text);
+do $$ begin
+  if not exists (
+    select 1 from pg_policies
+    where schemaname = 'storage' and tablename = 'objects'
+    and policyname = 'Users can delete own GPX files'
+  ) then
+    create policy "Users can delete own GPX files"
+      on storage.objects for delete
+      to authenticated
+      using (bucket_id = 'gpx-routes' AND (storage.foldername(name))[1] = auth.uid()::text);
+  end if;
+end $$;
