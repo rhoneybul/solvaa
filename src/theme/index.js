@@ -1,4 +1,4 @@
-// ── Paddle App Theme ─────────────────────────────────────────────────────────
+// ── Solvaa App Theme ─────────────────────────────────────────────────────────
 // Light, functional, map-focused. Single font: Inter.
 // Colour only for meaning (good/caution/warn), never decoration.
 

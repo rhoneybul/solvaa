@@ -1,4 +1,4 @@
-const CACHE = 'paddle-v1';
+const CACHE = 'solvaa-v1';
 
 // Assets to pre-cache on install
 const PRECACHE = [

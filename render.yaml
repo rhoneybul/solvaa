@@ -1,6 +1,6 @@
 services:
   - type: web
-    name: paddle-api
+    name: solvaa-api
     runtime: node
     rootDir: server
     buildCommand: npm install

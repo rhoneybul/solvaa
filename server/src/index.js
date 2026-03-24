@@ -41,5 +41,5 @@ app.use((err, _req, res, _next) => {
 });
 
 app.listen(PORT, () => {
-  console.log(`🛶  Paddle API running on http://localhost:${PORT}`);
+  console.log(`Solvaa API running on http://localhost:${PORT}`);
 });

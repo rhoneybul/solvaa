@@ -1,5 +1,5 @@
 /**
- * Paddle API client
+ * Solvaa API client
  *
  * In development:  calls http://localhost:3001
  * In production:   calls EXPO_PUBLIC_API_URL (set in .env)

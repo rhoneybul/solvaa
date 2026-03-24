@@ -1,7 +1,7 @@
 {
-  "name": "paddle-server",
+  "name": "solvaa-server",
   "version": "1.0.0",
-  "description": "Paddle app API server",
+  "description": "Solvaa app API server",
   "main": "src/index.js",
   "scripts": {
     "dev": "node --watch src/index.js",

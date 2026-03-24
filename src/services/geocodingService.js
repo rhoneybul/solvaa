@@ -10,7 +10,7 @@ export const SEARCH_DEBOUNCE_MS = 300;
 
 const PHOTON_BASE   = 'https://photon.komoot.io';
 const NOMINATIM_BASE = 'https://nominatim.openstreetmap.org';
-const USER_AGENT    = 'PaddleApp/1.0';
+const USER_AGENT    = 'SolvaaApp/1.0';
 
 /**
  * Search for locations. Returns up to `limit` results sorted by relevance.

@@ -1,8 +1,8 @@
 {
   "expo": {
-    "name": "Paddle",
-    "slug": "kayak-planner",
-    "scheme": "paddle",
+    "name": "Solvaa",
+    "slug": "solvaa",
+    "scheme": "solvaa",
     "version": "1.0.0",
     "orientation": "portrait",
     "icon": "./assets/icon.png",
@@ -14,10 +14,10 @@
     },
     "ios": {
       "supportsTablet": false,
-      "bundleIdentifier": "com.paddle.kayakplanner",
+      "bundleIdentifier": "com.solvaa.app",
       "infoPlist": {
-        "NSLocationWhenInUseUsageDescription": "Paddle needs your location to fetch local weather and track your route.",
-        "NSLocationAlwaysAndWhenInUseUsageDescription": "Paddle uses your location to track your paddle and monitor safety.",
+        "NSLocationWhenInUseUsageDescription": "Solvaa needs your location to fetch local weather and track your route.",
+        "NSLocationAlwaysAndWhenInUseUsageDescription": "Solvaa uses your location to track your paddle and monitor safety.",
         "ITSAppUsesNonExemptEncryption": false
       }
     },
@@ -26,7 +26,7 @@
         "foregroundImage": "./assets/adaptive-icon.png",
         "backgroundColor": "#f2f1ed"
       },
-      "package": "com.paddle.kayakplanner",
+      "package": "com.solvaa.app",
       "permissions": [
         "ACCESS_FINE_LOCATION",
         "ACCESS_COARSE_LOCATION",
@@ -39,8 +39,8 @@
       "bundler": "metro",
       "output": "single",
       "favicon": "./assets/favicon.png",
-      "name": "Paddle",
-      "shortName": "Paddle",
+      "name": "Solvaa",
+      "shortName": "Solvaa",
       "description": "Know the water before you go — AI-powered kayak trip planning",
       "themeColor": "#3a6a4a",
       "backgroundColor": "#f2f1ed",
@@ -50,7 +50,7 @@
       [
         "expo-location",
         {
-          "locationAlwaysAndWhenInUsePermission": "Paddle uses your location to track your route and provide real-time safety alerts."
+          "locationAlwaysAndWhenInUsePermission": "Solvaa uses your location to track your route and provide real-time safety alerts."
         }
       ],
       "expo-web-browser",
