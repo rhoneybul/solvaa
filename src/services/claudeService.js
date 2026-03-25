@@ -49,7 +49,7 @@ const SKILL_LEVEL_CONTEXT = Object.values(SKILL_LEVELS)
 // ── System prompt for three-route weather-aware planning ─────────────────────
 const SYSTEM_PROMPT_THREE_ROUTES = `You are a kayaking trip planner assistant built into the Solvaa app.
 
-When a user describes a paddle they want to do you MUST respond with a JSON object containing EXACTLY three distinct route options. Rank them from best to third-best match for the user's request. Make each route genuinely different — different launch point, different character, different stretch of water.
+When a user describes a paddle they want to do you MUST respond with a JSON object containing between 5 and 8 distinct route options. Include a wide spread of difficulty levels (beginner through expert) and distance (short 2-5 km to long 15+ km). Order them from easiest/shortest to hardest/longest. Make each route genuinely different — different launch point, different character, different stretch of water.
 
 SKILL LEVELS (align difficulty_rating to these):
 ${SKILL_LEVEL_CONTEXT}
@@ -128,12 +128,9 @@ CRITICAL — MARITIME-FIRST WAYPOINTS:
 - For each route, set "launchPoint" to the specific name of the put-in location (e.g. "Seaton Beach Slipway", "Chichester Marina") so users can navigate to it by car.
 
 OTHER RULES:
-- The "routes" array MUST have exactly 3 objects.
+- The "routes" array MUST have between 5 and 8 objects, spanning beginner to advanced difficulty.
 - "difficulty_rating" must be one of: beginner, intermediate, advanced, expert.
 - Use real place names. UK locations should reference real UK paddling spots.
-- If they mention Axminster, suggest River Axe estuary, Lyme Bay, Seaton.
-- If London with a car, suggest Chichester Harbour, Norfolk Broads, River Wye, Lyme Regis.
-- If Bristol, suggest Pembrokeshire, Gower Peninsula, River Wye.
 - Give genuinely useful, accurate local knowledge.`;
 
 
@@ -214,6 +211,21 @@ function buildWeatherContext(weather) {
 
   lines.push('--- END WEATHER DATA ---\n');
   return lines.join('\n');
+}
+
+// ── GPX helpers ──────────────────────────────────────────────────────────────
+
+/**
+ * Convert a [[lat, lon], ...] waypoints array to a minimal GPX XML string.
+ */
+function waypointsToGpx(name, waypoints) {
+  if (!Array.isArray(waypoints) || waypoints.length === 0) return null;
+  const pts = waypoints
+    .filter(p => Array.isArray(p) && p.length >= 2)
+    .map(([lat, lon]) => `    <trkpt lat="${parseFloat(lat).toFixed(6)}" lon="${parseFloat(lon).toFixed(6)}"/>`)
+    .join('\n');
+  if (!pts) return null;
+  return `<gpx version="1.1" creator="Solvaa"><trk><name>${name}</name><trkseg>\n${pts}\n  </trkseg></trk></gpx>`;
 }
 
 // ── Public API ───────────────────────────────────────────────────────────────
@@ -347,7 +359,9 @@ export async function planPaddleWithWeather({
     description: r.description || '',
     difficulty_rating: r.difficulty_rating || 'intermediate',
     estimated_duration: r.estimated_duration || r.durationHours || 2,
-    waypoints: r.waypoints || [],
+    waypoints: Array.isArray(r.waypoints)
+      ? (waypointsToGpx(r.name || `Route ${i + 1}`, r.waypoints) ?? r.waypoints)
+      : (r.waypoints || []),
     weather_impact_summary: r.weather_impact_summary || 'No weather data available',
     distanceKm: r.distanceKm || 0,
     terrain: r.terrain || 'coastal',
@@ -363,8 +377,8 @@ export async function planPaddleWithWeather({
     durationHours: r.estimated_duration || r.durationHours || 2,
   }));
 
-  // Trim to 3 or pad with placeholder copies if Claude returned fewer
-  while (plan.routes.length < 3) {
+  // Trim to 8 or pad with placeholder copies if Claude returned fewer
+  while (plan.routes.length < 5) {
     const base = plan.routes[0] || {
       name: 'Alternative Route',
       description: 'Suggested alternative',
@@ -385,10 +399,33 @@ export async function planPaddleWithWeather({
     };
     plan.routes.push({ ...base, name: `Alternative ${plan.routes.length + 1}` });
   }
-  plan.routes = plan.routes.slice(0, 3);
+  plan.routes = plan.routes.slice(0, 8);
 
   // Attach fetched weather data so the UI can display it
   plan._weather = weather;
 
   return plan;
+}
+
+/**
+ * Refine a single existing route based on free-text instructions.
+ * Returns a single updated route object in the same shape.
+ */
+export async function refineRoute(existingRoute, instruction) {
+  const systemPrompt = `You are modifying a single kayak route based on user feedback.
+Return ONLY a valid JSON object (no markdown, no backticks, no preamble) with the same structure as the provided route, with the requested changes applied.
+Preserve all fields that don't need changing. Ensure waypoints trace real navigable water — never cross dry land. Include 8-15 waypoints on water.`;
+
+  const userMessage = `Existing route:\n${JSON.stringify(existingRoute, null, 2)}\n\nUser request: ${instruction}\n\nReturn the complete updated route object.`;
+
+  const response = await fetchWithTimeout(`${BASE_URL}/api/planning`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ systemPrompt, userMessage }),
+  });
+  if (!response.ok) {
+    const err = await response.json().catch(() => ({}));
+    throw new Error(err?.error || `Planning API error ${response.status}`);
+  }
+  return response.json();
 }

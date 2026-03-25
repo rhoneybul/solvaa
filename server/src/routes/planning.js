@@ -127,7 +127,7 @@ async function callClaudeAPI(messages, systemPrompt) {
     },
     body: JSON.stringify({
       model: 'claude-sonnet-4-6',
-      max_tokens: 4096,
+      max_tokens: 16384,
       system: systemPrompt,
       messages: messages,
     }),

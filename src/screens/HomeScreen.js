@@ -1,7 +1,8 @@
 import { useEffect, useState, useCallback } from 'react';
 import {
-  View, Text, TouchableOpacity, StyleSheet, Platform, ActivityIndicator,
+  View, Text, TouchableOpacity, StyleSheet, Platform, ActivityIndicator, Button,
 } from 'react-native';
+import * as Sentry from '@sentry/react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { colors } from '../theme';
 import { getCurrentUser, signOut } from '../services/authService';
@@ -88,7 +89,8 @@ export default function HomeScreen({ navigation }) {
       {/* Header */}
       <View style={s.header}>
         <View>
-          <Text style={s.greeting}>{firstName ? `Hi, ${firstName}` : 'Paddle'}</Text>
+          <Text style={s.appName}>Solvaa</Text>
+          {firstName && <Text style={s.greeting}>Hi, {firstName}</Text>}
           <Text style={s.subtitle}>Ready to get on the water?</Text>
         </View>
         <TouchableOpacity onPress={handleSignOut} style={s.menuBtn} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
@@ -190,7 +192,8 @@ const s = StyleSheet.create({
   container:    { flex: 1, backgroundColor: colors.bg, paddingHorizontal: 16, paddingTop: 8 },
 
   header:       { flexDirection: 'row', alignItems: 'flex-start', justifyContent: 'space-between', paddingVertical: 16 },
-  greeting:     { fontSize: 22, fontWeight: '600', color: colors.text },
+  appName:      { fontSize: 26, fontWeight: '600', color: colors.text },
+  greeting:     { fontSize: 15, fontWeight: '400', color: colors.textMuted, marginTop: 1 },
   subtitle:     { fontSize: 13, fontWeight: '400', color: colors.textMuted, marginTop: 2 },
   menuBtn:      { padding: 4, marginTop: 4 },
   menuText:     { fontSize: 18, fontWeight: '600', color: colors.textMid, letterSpacing: 1 },

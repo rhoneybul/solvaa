@@ -1,6 +1,6 @@
 import { useMemo } from 'react';
 import { View, Text, StyleSheet } from 'react-native';
-import MapView, { Polyline, Marker } from 'react-native-maps';
+import MapView, { Polyline, Marker, Callout } from 'react-native-maps';
 import { colors } from '../theme';
 
 export function parseGpx(gpx) {
@@ -104,18 +104,52 @@ export default function PaddleMap({
 
   const selectedRoute = parsed[selectedIdx];
 
+  // Detect out-and-back: start and end within 300 m of each other
+  const selRaw = selectedRoute?.points || [];
+  const isOutAndBack = selRaw.length >= 2 && (() => {
+    const a = selRaw[0], b = selRaw[selRaw.length - 1];
+    const R = 6371000;
+    const dLat = (b.latitude - a.latitude) * Math.PI / 180;
+    const dLon = (b.longitude - a.longitude) * Math.PI / 180;
+    const s = Math.sin(dLat / 2) ** 2
+      + Math.cos(a.latitude * Math.PI / 180) * Math.cos(b.latitude * Math.PI / 180)
+      * Math.sin(dLon / 2) ** 2;
+    return R * 2 * Math.atan2(Math.sqrt(s), Math.sqrt(1 - s)) < 300;
+  })();
+
+  const midPoint = selRaw.length >= 2 ? selRaw[Math.floor(selRaw.length / 2)] : null;
+
   return (
     <View style={[styles.container, { height }]}>
       <MapView
+        key={selectedIdx}
         style={StyleSheet.absoluteFill}
         initialRegion={region ?? undefined}
-        region={region ?? undefined}
         customMapStyle={GREY_MAP_STYLE}
         showsUserLocation
         showsMyLocationButton={false}
         showsCompass={false}
         showsScale={false}
+        zoomEnabled
+        scrollEnabled
+        pitchEnabled={false}
       >
+        {/* Location pin when no routes yet */}
+        {parsed.every(r => r.points.length === 0) && coords && (
+          <Marker coordinate={{ latitude: coords.lat, longitude: coords.lon }}>
+            <View style={styles.markerWrap}>
+              {overlayTitle ? (
+                <View style={styles.markerLabel}>
+                  <Text style={[styles.markerLabelText, { color: colors.primary }]} numberOfLines={1}>
+                    {overlayTitle}
+                  </Text>
+                </View>
+              ) : null}
+              <View style={styles.markerStart} />
+            </View>
+          </Marker>
+        )}
+
         {/* Unselected routes — thin dashed */}
         {parsed.map(r => r.idx !== selectedIdx && r.points.length > 0 ? (
           <Polyline
@@ -137,22 +171,43 @@ export default function PaddleMap({
           />
         )}
 
-        {/* Start/end markers for selected route */}
+        {/* Start marker */}
         {selectedRoute?.points?.length > 0 && (
-          <>
-            <Marker
-              coordinate={selectedRoute.points[0]}
-              anchor={{ x: 0.5, y: 0.5 }}
-            >
+          <Marker coordinate={selectedRoute.points[0]} anchor={{ x: 0.5, y: 1.2 }}>
+            <View style={styles.markerWrap}>
+              <View style={styles.markerLabel}>
+                <Text style={[styles.markerLabelText, { color: selectedRoute.color }]}>Launch</Text>
+              </View>
               <View style={styles.markerStart} />
-            </Marker>
-            <Marker
-              coordinate={selectedRoute.points[selectedRoute.points.length - 1]}
-              anchor={{ x: 0.5, y: 0.5 }}
-            >
+            </View>
+          </Marker>
+        )}
+
+        {/* End marker — only shown for non-out-and-back routes */}
+        {selectedRoute?.points?.length > 0 && !isOutAndBack && (
+          <Marker
+            coordinate={selectedRoute.points[selectedRoute.points.length - 1]}
+            anchor={{ x: 0.5, y: 1.2 }}
+          >
+            <View style={styles.markerWrap}>
+              <View style={styles.markerLabel}>
+                <Text style={[styles.markerLabelText, { color: colors.warn }]}>Take-out</Text>
+              </View>
               <View style={styles.markerEnd} />
-            </Marker>
-          </>
+            </View>
+          </Marker>
+        )}
+
+        {/* Turnaround marker for out-and-back routes */}
+        {isOutAndBack && midPoint && (
+          <Marker coordinate={midPoint} anchor={{ x: 0.5, y: 1.2 }}>
+            <View style={styles.markerWrap}>
+              <View style={styles.markerLabel}>
+                <Text style={[styles.markerLabelText, { color: colors.textMid }]}>Turn point</Text>
+              </View>
+              <View style={styles.markerMid} />
+            </View>
+          </Marker>
         )}
       </MapView>
 
@@ -175,6 +230,10 @@ const styles = StyleSheet.create({
   },
   overlayTitle: { fontSize: 13, fontWeight: '600', color: colors.text },
   overlayMeta:  { fontSize: 11, fontWeight: '400', color: colors.textMuted, marginTop: 2 },
+  markerWrap:   { alignItems: 'center' },
+  markerLabel:  { backgroundColor: 'rgba(255,255,255,0.93)', borderRadius: 4, paddingHorizontal: 5, paddingVertical: 2, marginBottom: 3 },
+  markerLabelText: { fontSize: 9, fontWeight: '600' },
   markerStart:  { width: 10, height: 10, borderRadius: 5, backgroundColor: colors.primary, borderWidth: 2, borderColor: '#fff' },
   markerEnd:    { width: 10, height: 10, borderRadius: 5, backgroundColor: colors.warn, borderWidth: 2, borderColor: '#fff' },
+  markerMid:    { width: 10, height: 10, borderRadius: 5, backgroundColor: '#fff', borderWidth: 2, borderColor: colors.textMid },
 });

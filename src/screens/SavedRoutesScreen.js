@@ -1,15 +1,17 @@
 import { useState, useEffect, useCallback } from 'react';
 import {
-  View, Text, TouchableOpacity, StyleSheet, FlatList, Alert, ScrollView, RefreshControl,
+  View, Text, TextInput, TouchableOpacity, StyleSheet, FlatList, Alert, ScrollView, RefreshControl, Platform, ActivityIndicator,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { colors } from '../theme';
-import { getSavedRoutes, deleteSavedRoute } from '../services/storageService';
+import { getSavedRoutes, deleteSavedRoute, saveRoute } from '../services/storageService';
 import { getWeatherWithCache } from '../services/weatherService';
+import { refineRoute } from '../services/claudeService';
 import PaddleMap from '../components/PaddleMap';
 import ConditionsTimeline from '../components/ConditionsTimeline';
 import { gpxRouteBearing } from '../components/PaddleMap';
 import { HeartIcon } from '../components/UI';
+import { HomeIcon, TrashIcon, PencilIcon } from '../components/Icons';
 
 // ── Date helpers ──────────────────────────────────────────────────────────────
 
@@ -51,7 +53,12 @@ export default function SavedRoutesScreen({ navigation }) {
   const [viewDate, setViewDate]           = useState(getTodayString());
   const [weather, setWeather]             = useState(null);
   const [weatherLoading, setWeatherLoading] = useState(false);
-  const [refreshing, setRefreshing]       = useState(false); // Ticket 5
+  const [refreshing, setRefreshing]       = useState(false);
+  const [editText, setEditText]           = useState('');
+  const [editLoading, setEditLoading]     = useState(false);
+  const [showEdit, setShowEdit]           = useState(false);
+  const [editingName, setEditingName]     = useState(false);
+  const [nameInput, setNameInput]         = useState('');
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -84,17 +91,55 @@ export default function SavedRoutesScreen({ navigation }) {
   }, [selected?.id]);
 
   const handleDelete = (id) => {
-    Alert.alert('Delete Route', 'Remove this route from your saved routes?', [
-      { text: 'Cancel', style: 'cancel' },
-      {
-        text: 'Delete', style: 'destructive',
-        onPress: async () => {
-          await deleteSavedRoute(id);
-          await load();
-          if (selected?.id === id) setSelected(null);
-        },
-      },
-    ]);
+    const doDelete = async () => {
+      await deleteSavedRoute(id);
+      await load();
+      if (selected?.id === id) setSelected(null);
+    };
+
+    if (Platform.OS === 'web') {
+      if (window.confirm('Remove this route from your saved routes?')) doDelete();
+    } else {
+      Alert.alert('Delete Route', 'Remove this route from your saved routes?', [
+        { text: 'Cancel', style: 'cancel' },
+        { text: 'Delete', style: 'destructive', onPress: doDelete },
+      ]);
+    }
+  };
+
+  const handleRename = async () => {
+    const trimmed = nameInput.trim();
+    if (!trimmed || trimmed === selected.name) { setEditingName(false); return; }
+    try {
+      const renamed = { ...selected, name: trimmed };
+      await deleteSavedRoute(selected.id);
+      await saveRoute(renamed, trimmed);
+      const fresh = await getSavedRoutes();
+      setRoutes(fresh);
+      setSelected(fresh.find(r => r.name === trimmed) || renamed);
+    } catch { Alert.alert('Error', 'Could not rename — please try again.'); }
+    setEditingName(false);
+  };
+
+  const handleRefine = async () => {
+    if (!editText.trim() || editLoading) return;
+    setEditLoading(true);
+    try {
+      const updated = await refineRoute(selected, editText.trim());
+      const refined = { ...selected, ...updated };
+      // Persist: replace in storage by deleting old + saving updated with same id
+      await deleteSavedRoute(selected.id);
+      await saveRoute({ ...refined, id: selected.id }, refined.name);
+      const fresh = await getSavedRoutes();
+      setRoutes(fresh);
+      setSelected(fresh.find(r => r.name === refined.name) || refined);
+      setEditText('');
+      setShowEdit(false);
+    } catch (e) {
+      Alert.alert('Error', 'Could not refine route — please try again.');
+    } finally {
+      setEditLoading(false);
+    }
   };
 
   // ── Detail view ─────────────────────────────────────────────────────────────
@@ -116,21 +161,53 @@ export default function SavedRoutesScreen({ navigation }) {
             </TouchableOpacity>
             <Text style={s.navTitle} numberOfLines={1}>{selected.name}</Text>
             <TouchableOpacity onPress={() => handleDelete(selected.id)} style={s.deleteBtn}>
-              <Text style={s.deleteBtnText}>Delete</Text>
+              <TrashIcon size={22} color={colors.warn} />
+            </TouchableOpacity>
+            <TouchableOpacity onPress={() => navigation.navigate('Home')} style={s.homeBtn}>
+              <HomeIcon size={22} color={colors.primary} />
             </TouchableOpacity>
           </View>
 
-          {/* Map — pinned */}
-          <PaddleMap
-            height={220}
-            coords={selected.locationCoords
-              ? { lat: selected.locationCoords.lat, lon: selected.locationCoords.lng }
-              : undefined}
-            routes={[selected]}
-            selectedIdx={0}
-            overlayTitle={selected.name}
-            overlayMeta={selected.launchPoint || selected.location}
-          />
+          {/* Map — pinned, with tappable name overlay */}
+          <View style={{ position: 'relative' }}>
+            <PaddleMap
+              height={220}
+              coords={selected.locationCoords
+                ? { lat: selected.locationCoords.lat, lon: selected.locationCoords.lng }
+                : undefined}
+              routes={[selected]}
+              selectedIdx={0}
+            />
+            {/* Tappable name pill over the map */}
+            <TouchableOpacity
+              style={s.mapNamePill}
+              onPress={() => { setNameInput(selected.name); setEditingName(true); }}
+              activeOpacity={0.85}
+            >
+              {editingName ? (
+                <TextInput
+                  style={s.mapNameInput}
+                  value={nameInput}
+                  onChangeText={setNameInput}
+                  autoFocus
+                  returnKeyType="done"
+                  onSubmitEditing={handleRename}
+                  onBlur={handleRename}
+                  selectTextOnFocus
+                />
+              ) : (
+                <>
+                  <View style={s.mapNameRow}>
+                    <Text style={s.mapNameText} numberOfLines={1}>{selected.name}</Text>
+                    <PencilIcon size={11} color={colors.textMuted} />
+                  </View>
+                  {(selected.launchPoint || selected.location) ? (
+                    <Text style={s.mapNameSub} numberOfLines={1}>{selected.launchPoint || selected.location}</Text>
+                  ) : null}
+                </>
+              )}
+            </TouchableOpacity>
+          </View>
 
           {/* Scrollable content */}
           <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{ paddingBottom: 48 }}>
@@ -149,17 +226,48 @@ export default function SavedRoutesScreen({ navigation }) {
               ))}
             </View>
 
-            {/* Drive info */}
-            {selected.travelTimeMin > 0 && (
-              <View style={s.driveBadge}>
-                <Text style={s.driveBadgeText}>{selected.travelTimeMin} min drive · {selected.travelFromBase}</Text>
-              </View>
-            )}
-
             {/* GPX download badge */}
             {selected.gpxUrl && (
               <View style={s.gpxBadge}>
                 <Text style={s.gpxBadgeText}>GPX saved to cloud</Text>
+              </View>
+            )}
+
+            {/* Refine with AI */}
+            {!showEdit ? (
+              <TouchableOpacity style={s.refineBtn} onPress={() => setShowEdit(true)} activeOpacity={0.85}>
+                <Text style={s.refineBtnText}>Refine with AI</Text>
+              </TouchableOpacity>
+            ) : editLoading ? (
+              <View style={s.refineLoading}>
+                <ActivityIndicator size="small" color={colors.primary} />
+                <Text style={s.refineLoadingText}>Refining route…</Text>
+              </View>
+            ) : (
+              <View style={s.refineBox}>
+                <TextInput
+                  style={s.refineInput}
+                  value={editText}
+                  onChangeText={setEditText}
+                  placeholder='e.g. "make it easier" or "avoid open crossings"'
+                  placeholderTextColor={colors.textFaint}
+                  multiline
+                  textAlignVertical="top"
+                  autoFocus
+                />
+                <View style={s.refineBtnsRow}>
+                  <TouchableOpacity style={s.refineCancelBtn} onPress={() => { setShowEdit(false); setEditText(''); }} activeOpacity={0.7}>
+                    <Text style={s.refineCancelText}>Cancel</Text>
+                  </TouchableOpacity>
+                  <TouchableOpacity
+                    style={[s.refineSubmitBtn, !editText.trim() && s.refineSubmitDisabled]}
+                    onPress={handleRefine}
+                    disabled={!editText.trim()}
+                    activeOpacity={0.85}
+                  >
+                    <Text style={s.refineSubmitText}>Refine</Text>
+                  </TouchableOpacity>
+                </View>
               </View>
             )}
 
@@ -213,6 +321,7 @@ export default function SavedRoutesScreen({ navigation }) {
               <ConditionsTimeline
                 hourly={weather.hourly}
                 date={viewDate}
+                startHour={9}
                 routeBearing={routeBearing}
               />
             ) : null}
@@ -232,6 +341,8 @@ export default function SavedRoutesScreen({ navigation }) {
                 ))}
               </View>
             )}
+
+            <View style={{ height: 32 }} />
           </ScrollView>
         </SafeAreaView>
       </View>
@@ -247,6 +358,9 @@ export default function SavedRoutesScreen({ navigation }) {
             <Text style={s.backText}>‹</Text>
           </TouchableOpacity>
           <Text style={s.navTitle}>Saved Paddles</Text>
+          <TouchableOpacity onPress={() => navigation.navigate('Home')} style={s.homeBtn}>
+            <HomeIcon size={22} color={colors.primary} />
+          </TouchableOpacity>
         </View>
 
         {loading ? (
@@ -323,14 +437,19 @@ const s = StyleSheet.create({
   back:          { width: 36, height: 36, alignItems: 'center', justifyContent: 'center' },
   backText:      { fontSize: 22, color: colors.primary },
   navTitle:      { flex: 1, fontSize: 15, fontWeight: '600', color: colors.text, marginLeft: 4 },
-  deleteBtn:     { paddingHorizontal: 8 },
-  deleteBtnText: { fontSize: 13, fontWeight: '500', color: colors.warn },
+  mapNamePill:   { position: 'absolute', bottom: 12, left: 12, backgroundColor: 'rgba(255,255,255,0.93)', borderRadius: 10, paddingHorizontal: 12, paddingVertical: 8, maxWidth: '72%' },
+  mapNameRow:    { flexDirection: 'row', alignItems: 'center', gap: 5 },
+  mapNameText:   { fontSize: 13, fontWeight: '600', color: colors.text, flexShrink: 1 },
+  mapNameSub:    { fontSize: 11, fontWeight: '400', color: colors.textMuted, marginTop: 2 },
+  mapNameInput:  { fontSize: 13, fontWeight: '600', color: colors.text, minWidth: 140, borderBottomWidth: 1, borderBottomColor: colors.border, paddingVertical: 0 },
+  deleteBtn:     { paddingHorizontal: 8, alignItems: 'center', justifyContent: 'center' },
+  homeBtn:       { paddingHorizontal: 8, paddingVertical: 4, alignItems: 'center', justifyContent: 'center' },
 
   // List
   list:        { padding: P, gap: 10 },
   routeCard:   { backgroundColor: colors.white, borderRadius: 14, overflow: 'hidden', borderWidth: 1, borderColor: colors.borderLight, shadowColor: '#000', shadowOffset: { width: 0, height: 1 }, shadowOpacity: 0.06, shadowRadius: 4, elevation: 2 },
   mapThumb:    { overflow: 'hidden', position: 'relative' },
-  heartOverlay:{ position: 'absolute', top: 6, right: 6, backgroundColor: 'rgba(255,255,255,0.85)', borderRadius: 12, padding: 4 },
+  heartOverlay:{ position: 'absolute', top: 6, left: 6, backgroundColor: 'rgba(255,255,255,0.85)', borderRadius: 12, padding: 4 },
   routeInfo:   { padding: P },
   routeName:   { fontSize: 14, fontWeight: '600', color: colors.text, marginBottom: 2 },
   routeLocation: { fontSize: 11, fontWeight: '400', color: colors.textMuted, marginBottom: 7 },
@@ -350,9 +469,6 @@ const s = StyleSheet.create({
   metaCellBorder: { borderRightWidth: 0.5, borderRightColor: colors.borderLight },
   metaCellLabel:  { fontSize: 8, fontWeight: '400', color: colors.textMuted, textTransform: 'uppercase', letterSpacing: 0.4, marginBottom: 2 },
   metaCellValue:  { fontSize: 11, fontWeight: '500', color: colors.text, textTransform: 'capitalize' },
-
-  driveBadge:     { marginHorizontal: P, marginBottom: 6, backgroundColor: colors.bgDeep, borderRadius: 8, paddingHorizontal: 12, paddingVertical: 8 },
-  driveBadgeText: { fontSize: 12, fontWeight: '400', color: colors.textMid },
 
   gpxBadge:       { marginHorizontal: P, marginBottom: 6, flexDirection: 'row', alignItems: 'center' },
   gpxBadgeText:   { fontSize: 10, fontWeight: '500', color: colors.primary },
@@ -379,4 +495,17 @@ const s = StyleSheet.create({
   chipsWrap:   { flexDirection: 'row', flexWrap: 'wrap', gap: 6, marginHorizontal: P, marginBottom: 8 },
   chip:        { backgroundColor: colors.bgDeep, borderRadius: 4, paddingHorizontal: 8, paddingVertical: 3 },
   chipText:    { fontSize: 10, fontWeight: '400', color: colors.textMid },
+
+  refineBtn:          { marginHorizontal: P, marginTop: 4, marginBottom: 8, borderWidth: 1, borderColor: colors.primary, borderRadius: 10, paddingVertical: 11, alignItems: 'center' },
+  refineBtnText:      { fontSize: 13, fontWeight: '500', color: colors.primary },
+  refineLoading:      { marginHorizontal: P, flexDirection: 'row', alignItems: 'center', gap: 8, paddingVertical: 12 },
+  refineLoadingText:  { fontSize: 12, fontWeight: '300', color: colors.textMuted },
+  refineBox:          { marginHorizontal: P, marginBottom: 8, backgroundColor: colors.white, borderRadius: 10, borderWidth: 1, borderColor: colors.border, padding: 10 },
+  refineInput:        { fontSize: 13, fontWeight: '300', color: colors.text, minHeight: 56, paddingTop: 0 },
+  refineBtnsRow:      { flexDirection: 'row', justifyContent: 'flex-end', gap: 8, marginTop: 8 },
+  refineCancelBtn:    { paddingHorizontal: 14, paddingVertical: 7 },
+  refineCancelText:   { fontSize: 13, fontWeight: '400', color: colors.textMuted },
+  refineSubmitBtn:    { backgroundColor: colors.primary, borderRadius: 8, paddingHorizontal: 18, paddingVertical: 7 },
+  refineSubmitDisabled: { opacity: 0.4 },
+  refineSubmitText:   { fontSize: 13, fontWeight: '600', color: '#fff' },
 });

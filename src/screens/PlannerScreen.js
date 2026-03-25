@@ -1,24 +1,24 @@
 import { useState, useRef, useEffect, useCallback, useMemo } from 'react';
+import { HomeIcon } from '../components/Icons';
 import {
   View, Text, TextInput, TouchableOpacity, StyleSheet,
-  ScrollView, Animated, Keyboard, Alert, Platform, Modal, RefreshControl,
+  ScrollView, Animated, Keyboard, Alert, Platform, Modal, RefreshControl, ActivityIndicator,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import * as Location from 'expo-location';
 import { colors } from '../theme';
 import {
-  SectionHeader, AlertBanner, ProgressBar, SegmentedControl,
-  ErrorState, HeartIcon, NavigateToStartButton,
+  SectionHeader, AlertBanner, ProgressBar,
+  ErrorState, HeartIcon,
 } from '../components/UI';
 import PaddleMap from '../components/PaddleMap';
 import ConditionsTimeline from '../components/ConditionsTimeline';
 import { gpxRouteBearing } from '../components/PaddleMap';
-import { planPaddleWithWeather, hasApiKey } from '../services/claudeService';
+import { planPaddleWithWeather, hasApiKey, refineRoute } from '../services/claudeService';
 import { SKILL_LEVELS, getStravaTokens, fetchStravaActivities, inferSkillFromStrava } from '../services/stravaService';
 import { searchLocations, MIN_SEARCH_LENGTH, SEARCH_DEBOUNCE_MS } from '../services/geocodingService';
 import { getWeatherWithCache } from '../services/weatherService';
 import { saveRoute, getSavedRoutes, deleteSavedRoute } from '../services/storageService';
-import { extractStartCoords, navigateToStart } from '../services/navigationService';
 import {
   validateMaritimeRoute,
   normaliseWaypointCoords,
@@ -26,35 +26,21 @@ import {
   buildNavigateToStartUrl,
 } from '../services/routeService';
 
-// Native date picker — not available on web
-let DateTimePicker = null;
-if (Platform.OS !== 'web') {
-  DateTimePicker = require('@react-native-community/datetimepicker').default;
-}
-
-const TRANSPORT_OPTIONS = ['Car', 'Public Transport'];
-const DESIRED_STOPS = ['Coffee', 'Pub', 'Swim', 'Campsite', 'Picnic', 'Wildlife'];
-
-const SKILL_OPTIONS = [
-  { ...SKILL_LEVELS.BEGINNER,     effort: 'Easy — flat water, gentle pace' },
-  { ...SKILL_LEVELS.INTERMEDIATE, effort: 'Moderate — coastal or river, steady pace' },
-  { ...SKILL_LEVELS.ADVANCED,     effort: 'Hard — open water, challenging conditions' },
-  { ...SKILL_LEVELS.EXPERT,       effort: 'Expert — expedition-grade, all conditions' },
+const MIN_HOURS_OPTIONS = [1, 2, 3, 4, 5, 6];
+const MAX_HOURS_OPTIONS = [1, 2, 3, 4, 5, 6];
+const MAX_TRAVEL_OPTIONS = [
+  { label: '15 min', value: 15 },
+  { label: '30 min', value: 30 },
+  { label: '1 hr',   value: 60 },
+  { label: '2 hr',   value: 120 },
+  { label: 'Any',    value: 9999 },
 ];
 
-// Hour options for the time window picker (6am → 9pm)
-const HOURS = Array.from({ length: 16 }, (_, i) => {
-  const h = i + 6; // 6..21
-  return { value: h, label: h < 12 ? `${h}am` : h === 12 ? '12pm' : `${h - 12}pm` };
-});
-
-const DURATION_OPTIONS = [1, 2, 3, 4, 5, 6];
-
-// Date strip: today through +21 days (22 chips)
-const DATE_STRIP = (() => {
+// Results weather date strip: today through +7 days
+const RESULTS_DATE_STRIP = (() => {
   const arr = [];
   const today = new Date();
-  for (let i = 0; i <= 21; i++) {
+  for (let i = 0; i <= 7; i++) {
     const d = new Date(today);
     d.setDate(today.getDate() + i);
     arr.push(`${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`);
@@ -113,14 +99,13 @@ function dateToString(d) {
 
 
 export default function PlannerScreen({ navigation }) {
-  // Date state — null means "Plan for Later" (Ticket 2)
-  const [tripDate, setTripDate]           = useState(null);
-  const [showDatePicker, setShowDatePicker] = useState(false);
+  // Optional free-text nudge
+  const [nudge, setNudge] = useState('');
 
-  // Time window state (hours, 24h)
-  const [startHour, setStartHour]           = useState(9);  // 9am
-  const [endHour, setEndHour]               = useState(17); // 5pm
-  const [paddleDurationHrs, setPaddleDurationHrs] = useState(3);
+  // Duration range
+  const [minDurationHrs, setMinDurationHrs] = useState(2);
+  const [maxDurationHrs, setMaxDurationHrs] = useState(4);
+  const [maxTravelMins, setMaxTravelMins]   = useState(60);
 
   // Location
   const [destination, setDestination]       = useState('');
@@ -133,15 +118,14 @@ export default function PlannerScreen({ navigation }) {
   // Weather
   const [weatherData, setWeatherData]     = useState(null);
   const [weatherLoading, setWeatherLoading] = useState(false);
+  const [resultsDate, setResultsDate]     = useState(null); // date selected on results for weather
 
   const weatherDates = useMemo(() => {
     if (!weatherData?.hourly) return new Set();
     return new Set(weatherData.hourly.map(h => h.time?.slice(0, 10)).filter(Boolean));
   }, [weatherData]);
 
-  // Trip options
-  const [transport, setTransport]         = useState('Car');
-  const [selectedStops, setSelectedStops] = useState([]);
+  // Strava skill inference
   const [skillLevel, setSkillLevel]       = useState(SKILL_LEVELS.INTERMEDIATE);
   const [previousPaddle, setPreviousPaddle] = useState(null);
   const [stravaLoaded, setStravaLoaded]   = useState(false);
@@ -162,6 +146,10 @@ export default function PlannerScreen({ navigation }) {
   const [saveModalRoute, setSaveModalRoute] = useState(null); // route obj being saved
   const [saveNameInput, setSaveNameInput]   = useState('');
   const [saving, setSaving]                 = useState(false);
+
+  const [editingRouteIdx, setEditingRouteIdx] = useState(-1);
+  const [editText, setEditText]               = useState('');
+  const [editLoading, setEditLoading]         = useState(false);
 
   // Favorites state (Ticket 3)
   const [savedRouteNames, setSavedRouteNames] = useState(new Set());
@@ -225,9 +213,9 @@ export default function PlannerScreen({ navigation }) {
     })();
   }, []);
 
-  // Fetch weather when location changes (Ticket 2: only when date is set)
+  // Fetch weather when location changes
   useEffect(() => {
-    if (!locationCoords || !tripDate) { setWeatherData(null); return; }
+    if (!locationCoords) { setWeatherData(null); return; }
     let cancelled = false;
     (async () => {
       setWeatherLoading(true);
@@ -241,7 +229,7 @@ export default function PlannerScreen({ navigation }) {
       }
     })();
     return () => { cancelled = true; };
-  }, [locationCoords?.lat, locationCoords?.lng, tripDate]);
+  }, [locationCoords?.lat, locationCoords?.lng]);
 
   // Debounced location search
   const handleDestinationChange = useCallback((text) => {
@@ -273,31 +261,22 @@ export default function PlannerScreen({ navigation }) {
     Keyboard.dismiss();
   }, []);
 
-  const toggleStop = (stop) => {
-    setSelectedStops(prev => prev.includes(stop) ? prev.filter(s => s !== stop) : [...prev, stop]);
-  };
-
-
   const buildPrompt = () => {
-    const hrLabel = (h) => HOURS.find(x => x.value === h)?.label ?? `${h}:00`;
+    const travelLabel = MAX_TRAVEL_OPTIONS.find(o => o.value === maxTravelMins)?.label ?? 'any distance';
     const parts = [
-      `I'm in ${destination} and am available from ${hrLabel(startHour)} to ${hrLabel(endHour)}`,
-      `I want to paddle for approximately ${paddleDurationHrs} hour${paddleDurationHrs > 1 ? 's' : ''}`,
-      `I have access to ${transport.toLowerCase()}`,
-      `My skill level is ${skillLevel.label.toLowerCase()}`,
+      `I'm near ${destination}`,
+      `I want to paddle for between ${minDurationHrs} and ${maxDurationHrs} hour${maxDurationHrs > 1 ? 's' : ''}`,
     ];
-    if (selectedStops.length > 0) parts.push(`I'd like stops for: ${selectedStops.join(', ').toLowerCase()}`);
-    if (previousPaddle) parts.push(`My last paddle was "${previousPaddle.name}" (${previousPaddle.distance} km on ${previousPaddle.date})`);
+    if (maxTravelMins < 9999) parts.push(`I can travel up to ${travelLabel} to reach the launch point`);
+    if (previousPaddle) parts.push(`My last paddle was "${previousPaddle.name}" (${previousPaddle.distance} km)`);
+    if (nudge.trim()) parts.push(nudge.trim());
     return parts.join('. ') + '.';
   };
 
   const handleGenerate = async () => {
     Keyboard.dismiss();
+
     if (!destination.trim()) return;
-if (startHour >= endHour) {
-      Alert.alert('Invalid Time', 'End time must be after start time.');
-      return;
-    }
 
     const input = buildPrompt();
     setPrompt(input);
@@ -307,6 +286,7 @@ if (startHour >= endHour) {
     fadeAnim.setValue(0);
     setSelectedRouteIdx(0);
     setExpandedRoute(-1);
+    setResultsDate(null);
     setLoadingPct(0);
     setLoadingMsg(LOADING_MESSAGES[0]);
 
@@ -322,10 +302,9 @@ if (startHour >= endHour) {
         prompt: input,
         lat: locationCoords?.lat,
         lon: locationCoords?.lng,
-        date: tripDate || undefined,
-        durationHrs: paddleDurationHrs,
-        transport: transport.toLowerCase().replace(' ', '_'),
-        interests: selectedStops.length > 0 ? selectedStops : undefined,
+        minDurationHrs,
+        maxDurationHrs,
+        maxTravelMins: maxTravelMins < 9999 ? maxTravelMins : undefined,
         location: locationCoords ? { lat: locationCoords.lat, lng: locationCoords.lng } : undefined,
       });
 
@@ -360,7 +339,7 @@ if (startHour >= endHour) {
 
   const reset = () => {
     setPlan(null); setPlanError(null); setPrompt(''); fadeAnim.setValue(0);
-    setSelectedRouteIdx(0); setExpandedRoute(-1);
+    setSelectedRouteIdx(0); setExpandedRoute(-1); setResultsDate(null);
   };
 
   const difficultyColor = (d) => {
@@ -371,63 +350,50 @@ if (startHour >= endHour) {
     return { bg: colors.warnLight, fg: colors.warn };
   };
 
-  const hrLabel = (h) => HOURS.find(x => x.value === h)?.label ?? `${h}:00`;
-
-  // Ticket 3: Check if a route is favorited
+  // Check if a route is favorited
   const isRouteFavorited = (routeName) => savedRouteNames.has(routeName);
 
-  // Ticket 3: Toggle favorite
-  const handleToggleFavorite = async (routeData) => {
+  const handleToggleFavorite = (routeData) => {
     const name = routeData.name || '';
     if (isRouteFavorited(name)) {
-      // Unfavorite — find and delete
-      Alert.alert('Remove Favorite', `Remove "${name}" from saved routes?`, [
-        { text: 'Cancel', style: 'cancel' },
-        {
-          text: 'Remove', style: 'destructive',
-          onPress: async () => {
-            try {
-              const routes = await getSavedRoutes();
-              const target = routes.find(r => r.name === name);
-              if (target) await deleteSavedRoute(target.id);
+      // Unfavorite
+      if (Platform.OS === 'web') {
+        if (!window.confirm(`Remove "${name}" from saved routes?`)) return;
+        getSavedRoutes().then(saved => {
+          const target = saved.find(r => r.name === name);
+          if (target) deleteSavedRoute(target.id);
+          setSavedRouteNames(prev => { const next = new Set(prev); next.delete(name); return next; });
+        }).catch(() => {});
+      } else {
+        Alert.alert('Remove', `Remove "${name}" from saved routes?`, [
+          { text: 'Cancel', style: 'cancel' },
+          { text: 'Remove', style: 'destructive', onPress: () => {
+            getSavedRoutes().then(saved => {
+              const target = saved.find(r => r.name === name);
+              if (target) deleteSavedRoute(target.id);
               setSavedRouteNames(prev => { const next = new Set(prev); next.delete(name); return next; });
-            } catch { /* ignore */ }
-          },
-        },
-      ]);
-    } else {
-      // Save as favorite
-      try {
-        await saveRoute(routeData, name);
-        setSavedRouteNames(prev => new Set(prev).add(name));
-      } catch {
-        Alert.alert('Error', 'Could not save — please try again.');
+            }).catch(() => {});
+          }},
+        ]);
       }
+    } else {
+      // Open save modal so user can confirm/edit the name
+      setSaveModalRoute(routeData);
+      setSaveNameInput(name);
     }
   };
 
-  // Ticket 1: Navigate to start
-  const handleNavigateToStart = (routeOrWaypoints) => {
-    const coords = extractStartCoords(routeOrWaypoints);
-    if (!coords) {
-      Alert.alert('No Start Location', 'Route start coordinates are not available.');
-      return;
-    }
-    navigateToStart(coords.lat, coords.lng);
-  };
-
-  // Ticket 5: Pull to refresh handler
   const onRefresh = useCallback(async () => {
     setRefreshing(true);
     try {
-      if (locationCoords && tripDate) {
+      if (locationCoords) {
         const weather = await getWeatherWithCache(locationCoords.lat, locationCoords.lng);
         setWeatherData(weather);
       }
       await loadSavedRouteNames();
     } catch { /* ignore */ }
     finally { setRefreshing(false); }
-  }, [locationCoords, tripDate, loadSavedRouteNames]);
+  }, [locationCoords, loadSavedRouteNames]);
 
   // ── ERROR STATE (Ticket 4) ──────────────────────────────────────────────
   if (planError && !plan && !loading) {
@@ -456,7 +422,20 @@ if (startHour >= endHour) {
               <Text style={s.backText}>{'\u2039'}</Text>
             </TouchableOpacity>
             <Text style={s.navTitle}>Plan a Paddle</Text>
+            <TouchableOpacity onPress={() => navigation.navigate('Home')} style={s.homeBtn}>
+              <HomeIcon size={22} color={colors.primary} />
+            </TouchableOpacity>
           </View>
+
+          {locationCoords && (
+            <PaddleMap
+              height={180}
+              coords={{ lat: locationCoords.lat, lon: locationCoords.lng }}
+              routes={[]}
+              selectedIdx={-1}
+              overlayTitle={destination}
+            />
+          )}
 
           <ScrollView
             style={s.scroll}
@@ -472,8 +451,9 @@ if (startHour >= endHour) {
               />
             }
           >
+            {<>
             {/* Location */}
-            <SectionHeader>Destination / Region</SectionHeader>
+            <SectionHeader>Where are you paddling?</SectionHeader>
             <View style={s.inputCard}>
               <TextInput
                 style={s.input}
@@ -512,234 +492,86 @@ if (startHour >= endHour) {
               </View>
             )}
 
-            {/* Date — Ticket 2: "Plan for Later" option */}
-            <SectionHeader>Trip Date</SectionHeader>
-            <ScrollView
-              horizontal
-              showsHorizontalScrollIndicator={false}
-              contentContainerStyle={s.dateStrip}
-            >
-              {/* Plan for Later chip */}
-              <TouchableOpacity
-                style={[s.dateDayChip, tripDate === null && s.dateDayChipActive, { minWidth: 60 }]}
-                onPress={() => setTripDate(null)}
-                activeOpacity={0.7}
-              >
-                <Text style={[s.dateDayName, tripDate === null && s.dateDayNameActive]}>LATER</Text>
-                <Text style={[s.dateDayNum, tripDate === null && s.dateDayNumActive, { fontSize: 12 }]}>
-                  {'\u2026'}
-                </Text>
-                <View style={[s.weatherDot, s.weatherDotNone]} />
-              </TouchableOpacity>
-
-              {DATE_STRIP.map((dateStr) => {
-                const isSelected = tripDate === dateStr;
-                const hasWeather = weatherDates.has(dateStr);
-                const isToday    = dateStr === getTodayString();
-                const d          = new Date(dateStr + 'T12:00:00');
-                const dayName    = d.toLocaleDateString('en', { weekday: 'short' });
-                return (
-                  <TouchableOpacity
-                    key={dateStr}
-                    style={[s.dateDayChip, isSelected && s.dateDayChipActive]}
-                    onPress={() => setTripDate(dateStr)}
-                    activeOpacity={0.7}
-                  >
-                    <Text style={[s.dateDayName, isSelected ? s.dateDayNameActive : isToday && s.dateDayToday]}>
-                      {isToday ? 'Today' : dayName}
-                    </Text>
-                    <Text style={[s.dateDayNum, isSelected && s.dateDayNumActive]}>
-                      {d.getDate()}
-                    </Text>
-                    <View style={[
-                      s.weatherDot,
-                      hasWeather
-                        ? (isSelected ? s.weatherDotSelected : s.weatherDotActive)
-                        : s.weatherDotNone,
-                    ]} />
-                  </TouchableOpacity>
-                );
-              })}
-            </ScrollView>
-
-            {/* "Other date" fallback for dates beyond the strip */}
-            {showDatePicker && Platform.OS !== 'web' && DateTimePicker && (
-              <Modal transparent animationType="fade">
-                <View style={s.dateModalBackdrop}>
-                  <View style={s.dateModalCard}>
-                    <View style={s.dateModalHeader}>
-                      <Text style={s.dateModalTitle}>Pick a date</Text>
-                      <TouchableOpacity onPress={() => setShowDatePicker(false)}>
-                        <Text style={s.dateModalDone}>Done</Text>
+            {/* Duration range */}
+            <SectionHeader>How long do you want to paddle?</SectionHeader>
+            <View style={s.durationRangeCard}>
+              <View style={s.durationRangeRow}>
+                <Text style={s.durationRangeLabel}>Min</Text>
+                <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ flex: 1 }}>
+                  <View style={s.durationChips}>
+                    {MIN_HOURS_OPTIONS.map(h => (
+                      <TouchableOpacity
+                        key={h}
+                        style={[s.durationChip, minDurationHrs === h && s.durationChipActive]}
+                        onPress={() => { setMinDurationHrs(h); if (h > maxDurationHrs) setMaxDurationHrs(h); }}
+                        activeOpacity={0.7}
+                      >
+                        <Text style={[s.durationChipText, minDurationHrs === h && s.durationChipTextActive]}>
+                          {h === 6 ? '6h+' : `${h}h`}
+                        </Text>
                       </TouchableOpacity>
-                    </View>
-                    <DateTimePicker
-                      value={dateStringToDate(tripDate)}
-                      mode="date"
-                      display={Platform.OS === 'ios' ? 'inline' : 'default'}
-                      onChange={(_, selected) => {
-                        if (Platform.OS === 'android') setShowDatePicker(false);
-                        if (selected) setTripDate(dateToString(selected));
-                      }}
-                    />
+                    ))}
                   </View>
-                </View>
-              </Modal>
-            )}
-            {showDatePicker && Platform.OS === 'web' && (
-              <TextInput
-                style={s.dateInput}
-                value={tripDate || ''}
-                onChangeText={(v) => { if (isDateValid(v)) { setTripDate(v); setShowDatePicker(false); } }}
-                placeholder="YYYY-MM-DD"
-                placeholderTextColor={colors.textFaint}
-                maxLength={10}
-                autoFocus
-                onBlur={() => setShowDatePicker(false)}
-              />
-            )}
-            <TouchableOpacity style={s.otherDateBtn} onPress={() => setShowDatePicker(true)}>
-              <Text style={s.otherDateText}>Other date{'\u2026'}</Text>
-            </TouchableOpacity>
-
-            {/* Time window */}
-            <SectionHeader>Time Window</SectionHeader>
-            <View style={s.timeWindowCard}>
-              <View style={s.timeRow}>
-                <View style={s.timeCol}>
-                  <Text style={s.timeColLabel}>Start</Text>
-                  <ScrollView horizontal showsHorizontalScrollIndicator={false}>
-                    <View style={s.timeChips}>
-                      {HOURS.slice(0, 10).map(h => (
-                        <TouchableOpacity
-                          key={h.value}
-                          style={[s.timeChip, startHour === h.value && s.timeChipActive]}
-                          onPress={() => { setStartHour(h.value); if (h.value >= endHour) setEndHour(h.value + 1); }}
-                          activeOpacity={0.7}
-                        >
-                          <Text style={[s.timeChipText, startHour === h.value && s.timeChipTextActive]}>{h.label}</Text>
-                        </TouchableOpacity>
-                      ))}
-                    </View>
-                  </ScrollView>
-                </View>
+                </ScrollView>
               </View>
-              <View style={[s.timeRow, { marginTop: 8 }]}>
-                <View style={s.timeCol}>
-                  <Text style={s.timeColLabel}>End</Text>
-                  <ScrollView horizontal showsHorizontalScrollIndicator={false}>
-                    <View style={s.timeChips}>
-                      {HOURS.slice(1).map(h => (
-                        <TouchableOpacity
-                          key={h.value}
-                          style={[s.timeChip, endHour === h.value && s.timeChipActive, h.value <= startHour && s.timeChipDisabled]}
-                          onPress={() => h.value > startHour && setEndHour(h.value)}
-                          activeOpacity={0.7}
-                        >
-                          <Text style={[s.timeChipText, endHour === h.value && s.timeChipTextActive]}>{h.label}</Text>
-                        </TouchableOpacity>
-                      ))}
-                    </View>
-                  </ScrollView>
-                </View>
+              <View style={[s.durationRangeRow, { marginTop: 8 }]}>
+                <Text style={s.durationRangeLabel}>Max</Text>
+                <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ flex: 1 }}>
+                  <View style={s.durationChips}>
+                    {MAX_HOURS_OPTIONS.map(h => (
+                      <TouchableOpacity
+                        key={h}
+                        style={[s.durationChip, maxDurationHrs === h && s.durationChipActive, h < minDurationHrs && s.durationChipDisabled]}
+                        onPress={() => h >= minDurationHrs && setMaxDurationHrs(h)}
+                        activeOpacity={0.7}
+                      >
+                        <Text style={[s.durationChipText, maxDurationHrs === h && s.durationChipTextActive]}>
+                          {h === 6 ? '6h+' : `${h}h`}
+                        </Text>
+                      </TouchableOpacity>
+                    ))}
+                  </View>
+                </ScrollView>
               </View>
-              <View style={s.timeWindowSummary}>
-                <Text style={s.timeWindowSummaryText}>
-                  Available {hrLabel(startHour)} {'\u2192'} {hrLabel(endHour)}
+              <View style={s.durationSummary}>
+                <Text style={s.durationSummaryText}>
+                  {minDurationHrs === maxDurationHrs
+                    ? `${minDurationHrs}h paddle`
+                    : `${minDurationHrs}h – ${maxDurationHrs === 6 ? '6h+' : `${maxDurationHrs}h`} paddle`}
                 </Text>
               </View>
             </View>
 
-            {/* Paddle duration */}
-            <SectionHeader>How long do you want to paddle?</SectionHeader>
-            <View style={s.durationRow}>
-              {DURATION_OPTIONS.map(h => (
+            {/* Max travel time */}
+            <SectionHeader>Max travel to launch</SectionHeader>
+            <View style={s.travelChips}>
+              {MAX_TRAVEL_OPTIONS.map(opt => (
                 <TouchableOpacity
-                  key={h}
-                  style={[s.durationChip, paddleDurationHrs === h && s.durationChipActive]}
-                  onPress={() => setPaddleDurationHrs(h)}
+                  key={opt.value}
+                  style={[s.travelChip, maxTravelMins === opt.value && s.travelChipActive]}
+                  onPress={() => setMaxTravelMins(opt.value)}
                   activeOpacity={0.7}
                 >
-                  <Text style={[s.durationChipText, paddleDurationHrs === h && s.durationChipTextActive]}>
-                    {h === 6 ? '6h+' : `${h}h`}
+                  <Text style={[s.travelChipText, maxTravelMins === opt.value && s.travelChipTextActive]}>
+                    {opt.label}
                   </Text>
                 </TouchableOpacity>
               ))}
             </View>
 
-            {/* Ticket 2: Conditions — only when location + date are both set */}
-            {locationCoords && tripDate ? (
-              <>
-                <SectionHeader>Conditions</SectionHeader>
-                {weatherLoading ? (
-                  <View style={s.weatherCard}>
-                    <Text style={s.weatherLoading}>Loading forecast{'\u2026'}</Text>
-                  </View>
-                ) : weatherData && !weatherDates.has(tripDate) ? (
-                  <View style={s.weatherCard}>
-                    <Text style={s.weatherNoForecast}>No forecast available for this date {'\u2014'} weather data covers the next 7 days.</Text>
-                  </View>
-                ) : weatherData ? (
-                  <ConditionsTimeline
-                    hourly={weatherData.hourly}
-                    date={tripDate}
-                    startHour={startHour}
-                    endHour={endHour}
-                  />
-                ) : null}
-              </>
-            ) : locationCoords && !tripDate ? (
-              <>
-                <SectionHeader>Conditions</SectionHeader>
-                <View style={s.weatherCard}>
-                  <Text style={s.weatherNoForecast}>Select a date to see conditions</Text>
-                </View>
-              </>
-            ) : null}
-
-            {/* Transport */}
-            <SectionHeader>Getting there</SectionHeader>
-            <SegmentedControl options={TRANSPORT_OPTIONS} value={transport} onChange={setTransport} />
-
-            {/* Skill */}
-            <SectionHeader>Paddling proficiency</SectionHeader>
-            {previousPaddle && (
-              <View style={s.previousPaddle}>
-                <Text style={s.previousPaddleLabel}>Previous paddle</Text>
-                <Text style={s.previousPaddleValue}>
-                  {previousPaddle.name} {'\u00b7'} {previousPaddle.distance} km {'\u00b7'} {previousPaddle.date}
-                </Text>
-              </View>
-            )}
-            <View style={s.skillGrid}>
-              {SKILL_OPTIONS.map((sk) => (
-                <TouchableOpacity
-                  key={sk.key}
-                  style={[s.skillCard, skillLevel.key === sk.key && s.skillCardActive]}
-                  onPress={() => setSkillLevel(sk)}
-                  activeOpacity={0.7}
-                >
-                  <Text style={[s.skillLabel, skillLevel.key === sk.key && s.skillLabelActive]}>{sk.label}</Text>
-                  <Text style={s.skillEffort}>{sk.effort}</Text>
-                  <Text style={s.skillMeta}>Max {sk.maxWindKnots} kts {'\u00b7'} {sk.maxDistKm} km/day</Text>
-                </TouchableOpacity>
-              ))}
-            </View>
-            {stravaLoaded && <Text style={s.stravaNote}>Skill auto-detected from Strava</Text>}
-
-            {/* Stops */}
-            <SectionHeader>Desired stops</SectionHeader>
-            <View style={s.stopsWrap}>
-              {DESIRED_STOPS.map((stop) => (
-                <TouchableOpacity
-                  key={stop}
-                  style={[s.stopChip, selectedStops.includes(stop) && s.stopChipActive]}
-                  onPress={() => toggleStop(stop)}
-                  activeOpacity={0.7}
-                >
-                  <Text style={[s.stopChipText, selectedStops.includes(stop) && s.stopChipTextActive]}>{stop}</Text>
-                </TouchableOpacity>
-              ))}
+            {/* Nudge */}
+            <SectionHeader>Anything else?</SectionHeader>
+            <View style={s.inputCard}>
+              <TextInput
+                style={[s.input, { minHeight: 60 }]}
+                value={nudge}
+                onChangeText={setNudge}
+                placeholder={'e.g. "I want to see wildlife" or "avoid busy areas"'}
+                placeholderTextColor={colors.textFaint}
+                multiline
+                textAlignVertical="top"
+                returnKeyType="default"
+              />
             </View>
 
             {!hasApiKey() && (
@@ -756,10 +588,11 @@ if (startHour >= endHour) {
               disabled={!destination.trim()}
               activeOpacity={0.85}
             >
-              <Text style={s.generateBtnText}>Generate Trip {'\u2192'}</Text>
+              <Text style={s.generateBtnText}>Find Routes {'\u2192'}</Text>
             </TouchableOpacity>
 
             <View style={{ height: 48 }} />
+            </>}
           </ScrollView>
         </SafeAreaView>
       </View>
@@ -773,7 +606,7 @@ if (startHour >= endHour) {
         <View style={s.logoBadge}><Text style={s.logoEmoji}>{'\uD83D\uDEF6'}</Text></View>
         <Text style={s.loadTitle}>Planning your paddle{'\u2026'}</Text>
         <Text style={s.loadPrompt} numberOfLines={2}>
-          {destination} {'\u00b7'} {formatDateLabel(tripDate)} {'\u00b7'} {hrLabel(startHour)}{'\u2013'}{hrLabel(endHour)} {'\u00b7'} {skillLevel.label}
+          {`${destination} · ${minDurationHrs}–${maxDurationHrs}h paddle`}
         </Text>
         <View style={{ width: 200, marginTop: 8 }}>
           <ProgressBar startLabel="Analysing" endLabel="Done" pct={loadingPct} color={colors.primary} />
@@ -788,9 +621,7 @@ if (startHour >= endHour) {
 
   // ── RESULTS ───────────────────────────────────────────────────────────────
   const routes  = plan.routes  || [];
-  const packing = plan.packingHighlights || [];
   const sel     = routes[selectedRouteIdx] || {};
-  const selStartCoords = extractStartCoords(sel);
 
   return (
     <View style={s.container}>
@@ -799,49 +630,25 @@ if (startHour >= endHour) {
           <TouchableOpacity onPress={reset} style={s.back}>
             <Text style={s.backText}>{'\u2039'}</Text>
           </TouchableOpacity>
-          <Text style={s.navTitle}>{plan.location?.base || 'Your Paddle'}</Text>
-          <View style={s.countBadge}>
-            <Text style={s.countText}>{routes.length}</Text>
-          </View>
+          <Text style={s.navTitle}>{plan.location?.base || 'Your Routes'}</Text>
+          <TouchableOpacity onPress={() => navigation.navigate('Home')} style={s.homeBtn}>
+            <HomeIcon size={22} color={colors.primary} />
+          </TouchableOpacity>
         </View>
 
         {/* Map */}
         <View>
           <PaddleMap
-            height={200}
+            height={220}
             coords={locationCoords ? { lat: locationCoords.lat, lon: locationCoords.lng } : undefined}
             routes={routes}
             selectedIdx={selectedRouteIdx}
             overlayTitle={sel.name}
             overlayMeta={sel.launchPoint || plan.location?.base}
           />
-          {sel.travelTimeMin > 0 && (
-            <View style={s.driveBadge}>
-              <Text style={s.driveBadgeText}>{'\uD83D\uDE97'} {sel.travelTimeMin} min drive</Text>
-            </View>
-          )}
         </View>
 
-        {/* Route selector */}
-        <View style={s.routeSelector}>
-          {routes.map((r, i) => {
-            const active = selectedRouteIdx === i;
-            return (
-              <TouchableOpacity
-                key={i}
-                style={[s.routeSelectorTab, active && s.routeSelectorTabActive]}
-                onPress={() => { setSelectedRouteIdx(i); setExpandedRoute(-1); }}
-                activeOpacity={0.75}
-              >
-                <Text style={[s.routeSelectorNum, active && s.routeSelectorNumActive]}>{i + 1}</Text>
-                <Text style={[s.routeSelectorName, active && s.routeSelectorNameActive]} numberOfLines={1}>{r.name}</Text>
-                {r.distanceKm ? <Text style={[s.routeSelectorMeta, active && s.routeSelectorMetaActive]}>{r.distanceKm} km</Text> : null}
-              </TouchableOpacity>
-            );
-          })}
-        </View>
-
-        {/* Scrollable route detail */}
+        {/* Vertical scrollable route list */}
         <Animated.ScrollView
           style={{ opacity: fadeAnim, flex: 1 }}
           showsVerticalScrollIndicator={false}
@@ -855,169 +662,173 @@ if (startHour >= endHour) {
             />
           }
         >
-          {/* Selected route detail card */}
-          {(() => {
-            const r        = sel;
-            const dc       = difficultyColor(r.difficulty_rating || r.difficulty);
-            const expanded = expandedRoute === selectedRouteIdx;
+          {/* Route cards — primary focus */}
+          {routes.map((r, i) => {
+            const dc        = difficultyColor(r.difficulty_rating || r.difficulty);
+            const isActive  = selectedRouteIdx === i;
+            const isEditing = editingRouteIdx === i;
             return (
-              <View style={s.routeCard}>
-                <TouchableOpacity
-                  style={s.routeHeader}
-                  onPress={() => setExpandedRoute(expanded ? -1 : selectedRouteIdx)}
-                  activeOpacity={0.7}
-                >
+              <TouchableOpacity
+                key={i}
+                style={[s.routeCard, isActive && s.routeCardSel]}
+                onPress={() => { setSelectedRouteIdx(i); setEditingRouteIdx(-1); }}
+                activeOpacity={0.85}
+              >
+                {/* Single compact row: name + meta + heart */}
+                <View style={s.routeRow}>
+                  <View style={[s.diffDot, { backgroundColor: dc.fg }]} />
                   <View style={{ flex: 1 }}>
-                    <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
-                      <Text style={s.routeName}>{r.name}</Text>
-                      {/* Ticket 3: Heart icon next to route name */}
-                      <HeartIcon
-                        filled={isRouteFavorited(r.name)}
-                        size={18}
-                        onPress={() => handleToggleFavorite({ ...r, location: plan.location?.base || destination, locationCoords })}
-                      />
-                    </View>
-                    {r.description ? (
-                      <Text style={s.routeDescInline} numberOfLines={expanded ? 0 : 2}>{r.description}</Text>
-                    ) : null}
+                    <Text style={s.routeName} numberOfLines={1}>{r.name}</Text>
+                    <Text style={s.routeMeta}>
+                      {[
+                        r.distanceKm ? `${r.distanceKm} km` : null,
+                        r.estimated_duration ? `~${r.estimated_duration}h paddle` : null,
+                        r.travelTimeMin ? (r.travelTimeMin >= 60
+                          ? `${Math.floor(r.travelTimeMin / 60)}h${r.travelTimeMin % 60 ? ` ${r.travelTimeMin % 60}m` : ''} drive`
+                          : `${r.travelTimeMin} min drive`) : null,
+                        r.difficulty_rating || r.difficulty || null,
+                      ].filter(Boolean).join('  ·  ')}
+                    </Text>
                   </View>
-                  <View style={{ alignItems: 'flex-end', gap: 4 }}>
-                    <View style={[s.diffBadge, { backgroundColor: dc.bg }]}>
-                      <Text style={[s.diffText, { color: dc.fg }]}>{r.difficulty_rating || r.difficulty}</Text>
-                    </View>
-                    <Text style={s.descToggle}>{expanded ? '\u25B2' : '\u25BC'}</Text>
-                  </View>
-                </TouchableOpacity>
-
-                <View style={s.routeStats}>
-                  {[
-                    ['Distance', r.distanceKm ? `${r.distanceKm} km` : '\u2014'],
-                    ['Time',     r.estimated_duration ? `~${r.estimated_duration}h` : '\u2014'],
-                    ['Terrain',  r.terrain || '\u2014'],
-                  ].map(([l, v], si) => (
-                    <View key={l} style={[s.routeStat, si < 2 && { borderRightWidth: 0.5, borderRightColor: '#f0ede8' }]}>
-                      <Text style={s.routeStatLabel}>{l}</Text>
-                      <Text style={s.routeStatValue}>{v}</Text>
-                    </View>
-                  ))}
+                  <HeartIcon
+                    filled={isRouteFavorited(r.name)}
+                    size={20}
+                    onPress={() => handleToggleFavorite({ ...r, location: plan.location?.base || destination, locationCoords })}
+                  />
                 </View>
 
-                {expanded && (
-                  <View style={s.routeDetail}>
-                    {r.why ? <Text style={s.routeWhy}>{r.why}</Text> : null}
-                    {r.weather_impact_summary ? (
-                      <View style={s.weatherTip}><Text style={s.weatherTipText}>{r.weather_impact_summary}</Text></View>
-                    ) : null}
-                    {r.launchPoint ? <Text style={s.routeMetaRow}><Text style={s.routeMetaKey}>Launch  </Text>{r.launchPoint}</Text> : null}
-                    {r.travelFromBase ? <Text style={s.routeMetaRow}><Text style={s.routeMetaKey}>Travel  </Text>{r.travelFromBase}{r.travelTimeMin ? ` \u00b7 ${r.travelTimeMin} min` : ''}</Text> : null}
-                    {r.bestConditions ? <View style={s.condTip}><Text style={s.condTipText}>{r.bestConditions}</Text></View> : null}
-                    {r.highlights?.length > 0 && (
-                      <View style={s.highlights}>
-                        {r.highlights.map((h) => (
-                          <View key={h} style={s.highlightChip}><Text style={s.highlightText}>{h}</Text></View>
-                        ))}
-                      </View>
-                    )}
+                {/* Description — only when selected */}
+                {isActive && r.description ? (
+                  <Text style={s.routeDescInline}>{r.description}</Text>
+                ) : null}
 
-                    {/* Maritime validation warnings */}
-                    {r._maritimeValidation && !r._maritimeValidation.valid && (
-                      <View style={s.maritimeWarning}>
-                        <Text style={s.maritimeWarningTitle}>Route geometry notice</Text>
-                        {r._maritimeValidation.warnings.map((w, wi) => (
-                          <Text key={wi} style={s.maritimeWarningText}>{w}</Text>
-                        ))}
-                      </View>
-                    )}
-                  </View>
-                )}
-                {/* Navigate to start + Save buttons */}
-                <View style={s.routeActions}>
-                  {r._launchPoint && (
-                    <TouchableOpacity
-                      style={s.navigateBtn}
-                      onPress={() => {
-                        const url = buildNavigateToStartUrl(r._launchPoint.lat, r._launchPoint.lon);
-                        if (Platform.OS === 'web') {
-                          window.open(url, '_blank');
-                        } else {
-                          import('react-native').then(({ Linking }) => Linking.openURL(url));
-                        }
-                      }}
-                      activeOpacity={0.85}
-                    >
-                      <Text style={s.navigateBtnText}>Navigate to Start</Text>
-                    </TouchableOpacity>
-                  )}
+                {/* Navigate button — only when selected */}
+                {isActive && r._launchPoint && (
                   <TouchableOpacity
-                    style={[s.saveRouteBtn, r._launchPoint && s.saveRouteBtnFlex]}
+                    style={s.navigateBtn}
                     onPress={() => {
-                      setSaveModalRoute({ ...r, location: plan.location?.base || destination, locationCoords });
-                      setSaveNameInput(r.name || '');
+                      const url = buildNavigateToStartUrl(r._launchPoint.lat, r._launchPoint.lon);
+                      if (Platform.OS === 'web') { window.open(url, '_blank'); }
+                      else { import('react-native').then(({ Linking }) => Linking.openURL(url)); }
                     }}
                     activeOpacity={0.85}
                   >
-                    <Text style={s.saveRouteBtnText}>+ Save Route</Text>
+                    <Text style={s.navigateBtnText}>Navigate to Start</Text>
                   </TouchableOpacity>
-                </View>
-              </View>
+                )}
+
+                {/* Inline refinement — only when selected */}
+                {isActive && isEditing && (
+                  editLoading ? (
+                    <View style={s.refineLoading}>
+                      <ActivityIndicator size="small" color={colors.primary} />
+                      <Text style={s.refineLoadingText}>Refining route…</Text>
+                    </View>
+                  ) : (
+                    <View style={s.refineBox}>
+                      <TextInput
+                        style={s.refineInput}
+                        value={editText}
+                        onChangeText={setEditText}
+                        placeholder='e.g. "Make it shorter" or "Avoid open sea crossings"'
+                        placeholderTextColor={colors.textFaint}
+                        multiline
+                        autoFocus
+                      />
+                      <View style={s.refineActions}>
+                        <TouchableOpacity style={s.refineCancelBtn} onPress={() => { setEditingRouteIdx(-1); setEditText(''); }} activeOpacity={0.7}>
+                          <Text style={s.refineCancelText}>Cancel</Text>
+                        </TouchableOpacity>
+                        <TouchableOpacity
+                          style={[s.refineSubmitBtn, !editText.trim() && s.refineSubmitDisabled]}
+                          disabled={!editText.trim()}
+                          onPress={async () => {
+                            if (!editText.trim()) return;
+                            setEditLoading(true);
+                            try {
+                              const updated = await refineRoute(r, editText.trim());
+                              const newRoutes = [...routes];
+                              newRoutes[i] = { ...r, ...updated, _maritimeValidation: undefined, _launchPoint: getRouteLaunchPoint(updated) };
+                              setPlan(prev => ({ ...prev, routes: newRoutes }));
+                              setEditingRouteIdx(-1);
+                              setEditText('');
+                            } catch (e) {
+                              Alert.alert('Error', e.message || 'Could not refine route.');
+                            } finally {
+                              setEditLoading(false);
+                            }
+                          }}
+                          activeOpacity={0.85}
+                        >
+                          <Text style={s.refineSubmitText}>Apply</Text>
+                        </TouchableOpacity>
+                      </View>
+                    </View>
+                  )
+                )}
+                {isActive && !isEditing && (
+                  <TouchableOpacity
+                    style={s.refineBtn}
+                    onPress={() => { setEditingRouteIdx(i); setEditText(''); }}
+                    activeOpacity={0.7}
+                  >
+                    <Text style={s.refineBtnText}>Edit this route…</Text>
+                  </TouchableOpacity>
+                )}
+              </TouchableOpacity>
             );
-          })()}
+          })}
 
-          {/* Summary strip */}
-          <View style={s.summaryStrip}>
-            {[
-              ['Date',   formatDateLabel(tripDate)],
-              ['Window', `${hrLabel(startHour)}\u2013${hrLabel(endHour)}`],
-              ['Skill',  plan.conditions?.skillLevel || '\u2014'],
-            ].map(([label, value], i) => (
-              <View key={label} style={[s.summaryCell, i < 2 && s.summaryCellBorder]}>
-                <Text style={s.summaryCellLabel}>{label}</Text>
-                <Text style={s.summaryCellValue}>{value}</Text>
-              </View>
-            ))}
-          </View>
-
-          {/* Ticket 2: "Check Conditions for a Date" banner when no date */}
-          {!tripDate && (
+          {/* Weather — below routes */}
+          <SectionHeader style={{ marginTop: 8 }}>Conditions</SectionHeader>
+          <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={s.dateStrip}>
             <TouchableOpacity
-              style={s.checkConditionsBanner}
-              onPress={() => {
-                setTripDate(getTodayString());
-                reset();
-              }}
-              activeOpacity={0.85}
+              style={[s.dateDayChip, resultsDate === null && s.dateDayChipActive, { minWidth: 52 }]}
+              onPress={() => setResultsDate(null)}
+              activeOpacity={0.7}
             >
-              <Text style={s.checkConditionsText}>Check Conditions for a Date</Text>
+              <Text style={[s.dateDayName, resultsDate === null && s.dateDayNameActive]}>ANY</Text>
+              <Text style={[s.dateDayNum, resultsDate === null && s.dateDayNumActive, { fontSize: 11 }]}>{'\u2014'}</Text>
             </TouchableOpacity>
+            {RESULTS_DATE_STRIP.map((dateStr) => {
+              const isSelected = resultsDate === dateStr;
+              const isToday    = dateStr === getTodayString();
+              const d          = new Date(dateStr + 'T12:00:00');
+              const dayName    = d.toLocaleDateString('en', { weekday: 'short' });
+              return (
+                <TouchableOpacity
+                  key={dateStr}
+                  style={[s.dateDayChip, isSelected && s.dateDayChipActive]}
+                  onPress={() => setResultsDate(isSelected ? null : dateStr)}
+                  activeOpacity={0.7}
+                >
+                  <Text style={[s.dateDayName, isSelected ? s.dateDayNameActive : isToday && s.dateDayToday]}>
+                    {isToday ? 'Today' : dayName}
+                  </Text>
+                  <Text style={[s.dateDayNum, isSelected && s.dateDayNumActive]}>{d.getDate()}</Text>
+                </TouchableOpacity>
+              );
+            })}
+          </ScrollView>
+          {resultsDate && (
+            weatherData && weatherDates.has(resultsDate) ? (
+              <ConditionsTimeline
+                hourly={weatherData.hourly}
+                date={resultsDate}
+                startHour={9}
+                endHour={18}
+                routeBearing={gpxRouteBearing(sel?.waypoints)}
+              />
+            ) : (
+              <View style={[s.weatherCard, { marginHorizontal: P, marginBottom: 4 }]}>
+                <Text style={s.weatherNoForecast}>
+                  {weatherLoading ? 'Loading forecast…' : 'No forecast available for this date'}
+                </Text>
+              </View>
+            )
           )}
-
-          {/* Weather through the day — only if date is set (Ticket 2) */}
-          {tripDate && plan._weather?.hourly && plan._weather.hourly.length > 0 && (
-            <ConditionsTimeline
-              hourly={plan._weather.hourly}
-              date={tripDate}
-              startHour={startHour}
-              endHour={endHour}
-              routeBearing={gpxRouteBearing(routes[selectedRouteIdx]?.waypoints)}
-            />
-          )}
-
           {plan.weatherNote && <AlertBanner type="caution" title="Weather" body={plan.weatherNote} />}
           {plan.safetyNote  && <AlertBanner type="warn"    title="Safety"  body={plan.safetyNote}  />}
-
-          {packing.length > 0 && (
-            <>
-              <SectionHeader>Kit List</SectionHeader>
-              <View style={[s.kitCard, { marginHorizontal: P }]}>
-                {packing.map((item, i) => (
-                  <View key={i} style={[s.kitRow, i < packing.length - 1 && s.kitRowBorder]}>
-                    <View style={s.kitDot} />
-                    <Text style={s.kitText}>{item}</Text>
-                  </View>
-                ))}
-              </View>
-            </>
-          )}
 
           <View style={{ height: 48 }} />
         </Animated.ScrollView>
@@ -1046,7 +857,7 @@ if (startHour >= endHour) {
                   setSaving(true);
                   try {
                     await saveRoute(saveModalRoute, saveNameInput.trim());
-                    setSavedRouteNames(prev => new Set(prev).add(saveNameInput.trim()));
+                    setSavedRouteNames(prev => new Set(prev).add(saveModalRoute.name));
                     setSaveModalRoute(null);
                     Alert.alert('Saved', `"${saveNameInput.trim()}" added to your routes.`);
                   } catch { Alert.alert('Error', 'Could not save \u2014 please try again.'); }
@@ -1065,7 +876,7 @@ if (startHour >= endHour) {
                     setSaving(true);
                     try {
                       await saveRoute(saveModalRoute, saveNameInput.trim());
-                      setSavedRouteNames(prev => new Set(prev).add(saveNameInput.trim()));
+                      setSavedRouteNames(prev => new Set(prev).add(saveModalRoute.name));
                       setSaveModalRoute(null);
                       Alert.alert('Saved', `"${saveNameInput.trim()}" added to your routes.`);
                     } catch { Alert.alert('Error', 'Could not save \u2014 please try again.'); }
@@ -1123,7 +934,7 @@ const s = StyleSheet.create({
   coordsBadge: { marginHorizontal: P, marginBottom: 8, backgroundColor: colors.primaryLight, borderRadius: 5, paddingHorizontal: 8, paddingVertical: 4, alignSelf: 'flex-start' },
   coordsText:  { fontSize: 9, fontWeight: '400', color: colors.primary },
 
-  // Date strip
+  // Date strip (used on results screen for weather date picker)
   dateStrip:         { flexDirection: 'row', gap: 6, paddingHorizontal: P, paddingBottom: 8 },
   dateDayChip:       { alignItems: 'center', paddingVertical: 8, paddingHorizontal: 8, borderRadius: 10, backgroundColor: colors.white, borderWidth: 1, borderColor: colors.border, minWidth: 48 },
   dateDayChipActive: { backgroundColor: colors.primary, borderColor: colors.primary },
@@ -1132,32 +943,21 @@ const s = StyleSheet.create({
   dateDayToday:      { color: colors.primary, fontWeight: '600' },
   dateDayNum:        { fontSize: 15, fontWeight: '500', color: colors.text, lineHeight: 18 },
   dateDayNumActive:  { color: '#fff' },
-  weatherDot:        { width: 5, height: 5, borderRadius: 3, marginTop: 5 },
-  weatherDotActive:  { backgroundColor: colors.primary },
-  weatherDotSelected:{ backgroundColor: 'rgba(255,255,255,0.6)' },
-  weatherDotNone:    { backgroundColor: colors.borderLight },
-  otherDateBtn:      { marginHorizontal: P, marginBottom: 4, alignSelf: 'flex-start' },
-  otherDateText:     { fontSize: 11, fontWeight: '400', color: colors.textMuted },
-  dateInput:         { fontSize: 13, fontWeight: '400', color: colors.text, minHeight: 36, marginHorizontal: P, backgroundColor: colors.white, borderRadius: 8, borderWidth: 1, borderColor: colors.border, padding: 10, marginBottom: 8 },
-  dateModalBackdrop: { flex: 1, backgroundColor: 'rgba(0,0,0,0.35)', justifyContent: 'flex-end' },
-  dateModalCard:     { backgroundColor: colors.white, borderTopLeftRadius: 16, borderTopRightRadius: 16, padding: 16, paddingBottom: 32 },
-  dateModalHeader:   { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 },
-  dateModalTitle:    { fontSize: 13, fontWeight: '500', color: colors.text },
-  dateModalDone:     { fontSize: 14, fontWeight: '600', color: colors.primary },
 
-  // Time window
-  timeWindowCard:  { marginHorizontal: P, backgroundColor: colors.white, borderRadius: 10, borderWidth: 1, borderColor: colors.border, padding: 12, marginBottom: 8 },
-  timeRow:         { },
-  timeCol:         { },
-  timeColLabel:    { fontSize: 9, fontWeight: '500', color: colors.textMuted, textTransform: 'uppercase', letterSpacing: 0.5, marginBottom: 6 },
-  timeChips:       { flexDirection: 'row', gap: 5 },
-  timeChip:        { backgroundColor: colors.bgDeep, borderRadius: 14, paddingHorizontal: 10, paddingVertical: 5 },
-  timeChipActive:  { backgroundColor: colors.primary },
-  timeChipDisabled:{ opacity: 0.35 },
-  timeChipText:    { fontSize: 11, fontWeight: '400', color: colors.textMid },
-  timeChipTextActive: { color: '#fff', fontWeight: '500' },
-  timeWindowSummary: { marginTop: 10, paddingTop: 10, borderTopWidth: 0.5, borderTopColor: colors.borderLight },
-  timeWindowSummaryText: { fontSize: 12, fontWeight: '500', color: colors.primary, textAlign: 'center' },
+  // Duration range picker
+  durationRangeCard:    { marginHorizontal: P, backgroundColor: colors.white, borderRadius: 10, borderWidth: 1, borderColor: colors.border, padding: 12, marginBottom: 8 },
+  durationRangeRow:     { flexDirection: 'row', alignItems: 'center', gap: 10 },
+  durationRangeLabel:   { fontSize: 9, fontWeight: '500', color: colors.textMuted, textTransform: 'uppercase', letterSpacing: 0.5, width: 28 },
+  durationChips:        { flexDirection: 'row', gap: 5 },
+  durationSummary:      { marginTop: 10, paddingTop: 10, borderTopWidth: 0.5, borderTopColor: colors.borderLight },
+  durationSummaryText:  { fontSize: 12, fontWeight: '500', color: colors.primary, textAlign: 'center' },
+
+  // Max travel picker
+  travelChips:          { flexDirection: 'row', gap: 6, marginHorizontal: P, marginBottom: 8, flexWrap: 'wrap' },
+  travelChip:           { backgroundColor: colors.white, borderRadius: 10, borderWidth: 1, borderColor: colors.border, paddingHorizontal: 14, paddingVertical: 9, alignItems: 'center' },
+  travelChipActive:     { backgroundColor: colors.primary, borderColor: colors.primary },
+  travelChipText:       { fontSize: 13, fontWeight: '400', color: colors.textMid },
+  travelChipTextActive: { color: '#fff', fontWeight: '500' },
 
   // Weather card
   weatherCard:     { marginHorizontal: P, backgroundColor: colors.white, borderRadius: 9, borderWidth: 1, borderColor: colors.borderLight, padding: 10, marginBottom: 4, shadowColor: '#000', shadowOffset: { width: 0, height: 0.5 }, shadowOpacity: 0.07, shadowRadius: 2, elevation: 1 },
@@ -1231,7 +1031,10 @@ const s = StyleSheet.create({
 
   tabContent:  { paddingHorizontal: P, paddingTop: 2 },
   routeCard:   { backgroundColor: colors.white, borderTopWidth: 0.5, borderBottomWidth: 0.5, borderColor: colors.borderLight, overflow: 'hidden' },
-  routeCardSel:{ borderWidth: 1.5, borderColor: colors.primary },
+  routeCardSel:{ borderTopWidth: 1.5, borderBottomWidth: 1.5, borderColor: colors.primary },
+  routeRow:    { flexDirection: 'row', alignItems: 'center', paddingHorizontal: P, paddingVertical: 10, gap: 10 },
+  diffDot:     { width: 8, height: 8, borderRadius: 4, flexShrink: 0 },
+  routeMeta:   { fontSize: 11, fontWeight: '300', color: colors.textMuted, marginTop: 1 },
   routeHeader: { flexDirection: 'row', alignItems: 'center', padding: 11, gap: 8, borderBottomWidth: 0.5, borderBottomColor: '#f0ede8' },
   rankBadge:   { width: 19, height: 19, borderRadius: 10, alignItems: 'center', justifyContent: 'center', flexShrink: 0 },
   rankText:    { fontSize: 9, fontWeight: '600' },
@@ -1267,39 +1070,53 @@ const s = StyleSheet.create({
   descText:              { flex: 1, fontSize: 12, fontWeight: '300', color: colors.textMid, lineHeight: 17 },
   descToggle:            { fontSize: 9, color: colors.textMuted, paddingTop: 2 },
 
-  routeSelector:         { flexDirection: 'row', gap: 6, paddingHorizontal: P, paddingVertical: 8, backgroundColor: colors.white, borderBottomWidth: 0.5, borderBottomColor: colors.borderLight },
-  routeSelectorTab:      { flex: 1, backgroundColor: colors.bgDeep, borderRadius: 8, paddingVertical: 7, paddingHorizontal: 8, alignItems: 'center' },
-  routeSelectorTabActive:{ backgroundColor: colors.primary },
-  routeSelectorNum:      { fontSize: 10, fontWeight: '600', color: colors.textMuted, marginBottom: 2 },
-  routeSelectorNumActive:{ color: 'rgba(255,255,255,0.75)' },
-  routeSelectorName:     { fontSize: 11, fontWeight: '500', color: colors.text, textAlign: 'center' },
-  routeSelectorNameActive:{ color: '#fff' },
-  routeSelectorMeta:     { fontSize: 9, fontWeight: '300', color: colors.textMuted, marginTop: 1 },
-  routeSelectorMetaActive:{ color: 'rgba(255,255,255,0.65)' },
+  routeSelectorScroll:    { backgroundColor: colors.white, borderBottomWidth: 0.5, borderBottomColor: colors.borderLight },
+  routeSelector:          { flexDirection: 'row', gap: 5, paddingHorizontal: P, paddingVertical: 6 },
+  routeSelectorTab:       { width: 88, backgroundColor: colors.bgDeep, borderRadius: 7, paddingVertical: 5, paddingHorizontal: 7, borderLeftWidth: 3, borderLeftColor: colors.border },
+  routeSelectorTabActive: { backgroundColor: '#e8edf8' },
+  routeSelectorRow:       { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 2 },
+  routeSelectorNum:       { fontSize: 9, fontWeight: '600', color: colors.textMuted },
+  routeSelectorNumActive: { color: colors.textMid },
+  routeSelectorName:      { fontSize: 10, fontWeight: '500', color: colors.text },
+  routeSelectorNameActive:{ color: colors.text },
+  routeSelectorMeta:      { fontSize: 9, fontWeight: '300', color: colors.textMuted },
+  routeSelectorMetaActive:{ color: colors.textMid },
 
   routesList:       { paddingHorizontal: P, paddingTop: 2 },
   routeDescInline:  { fontSize: 11, fontWeight: '300', color: colors.textMid, marginTop: 2, lineHeight: 15 },
   onMapLabel:       { fontSize: 8.5, fontWeight: '500', color: colors.primary, textTransform: 'uppercase', letterSpacing: 0.4 },
 
-  // Route action buttons (navigate + save)
-  routeActions:       { flexDirection: 'row', gap: 8, margin: 10, marginTop: 0 },
-  navigateBtn:        { flex: 1, backgroundColor: colors.good, borderRadius: 8, paddingVertical: 13, alignItems: 'center' },
+  // Route action buttons
+  routeActions:       { flexDirection: 'row', gap: 8, marginHorizontal: P, marginBottom: 8 },
+  navigateBtn:        { marginHorizontal: P, marginBottom: 8, backgroundColor: colors.good, borderRadius: 8, paddingVertical: 11, alignItems: 'center' },
   navigateBtnText:    { fontSize: 13, fontWeight: '600', color: '#fff', letterSpacing: 0.2 },
-  saveRouteBtn:       { flex: 0, backgroundColor: colors.primary, borderRadius: 8, paddingVertical: 13, paddingHorizontal: 16, alignItems: 'center' },
-  saveRouteBtnFlex:   { flex: 1 },
-  saveRouteBtnText:   { fontSize: 14, fontWeight: '600', color: '#fff', letterSpacing: 0.2 },
+
+  homeBtn:     { paddingHorizontal: 8, paddingVertical: 4, alignItems: 'center', justifyContent: 'center' },
+
+  refineBtn:         { marginHorizontal: P, marginBottom: P, paddingVertical: 10, alignItems: 'center', borderTopWidth: 0.5, borderTopColor: colors.borderLight },
+  refineBtnText:     { fontSize: 12, fontWeight: '500', color: colors.primary },
+  refineLoading:     { margin: P, flexDirection: 'row', alignItems: 'center', gap: 10, paddingVertical: 14, justifyContent: 'center' },
+  refineLoadingText: { fontSize: 13, fontWeight: '400', color: colors.primary },
+  refineBox:         { margin: P, backgroundColor: colors.bgDeep, borderRadius: 10, padding: 10 },
+  refineInput:       { fontSize: 13, fontWeight: '400', color: colors.text, minHeight: 56, lineHeight: 20 },
+  refineActions:     { flexDirection: 'row', justifyContent: 'flex-end', gap: 8, marginTop: 8 },
+  refineCancelBtn:   { paddingHorizontal: 14, paddingVertical: 7, borderRadius: 7, borderWidth: 1, borderColor: colors.border },
+  refineCancelText:  { fontSize: 12, fontWeight: '500', color: colors.textMid },
+  refineSubmitBtn:   { paddingHorizontal: 18, paddingVertical: 7, borderRadius: 7, backgroundColor: colors.primary },
+  refineSubmitDisabled: { backgroundColor: colors.textFaint },
+  refineSubmitText:  { fontSize: 12, fontWeight: '600', color: '#fff' },
 
   // Maritime validation warnings
   maritimeWarning:      { backgroundColor: colors.cautionLight, borderRadius: 6, padding: 8, marginTop: 8 },
   maritimeWarningTitle: { fontSize: 10, fontWeight: '600', color: colors.caution, marginBottom: 3 },
   maritimeWarningText:  { fontSize: 9.5, fontWeight: '300', color: colors.caution, lineHeight: 14 },
 
-  // Duration picker
-  durationRow:      { flexDirection: 'row', gap: 8, marginHorizontal: P, marginBottom: 8, flexWrap: 'wrap' },
-  durationChip:     { flex: 1, minWidth: 48, backgroundColor: colors.white, borderRadius: 10, borderWidth: 1, borderColor: colors.border, paddingVertical: 9, alignItems: 'center' },
-  durationChipActive: { backgroundColor: colors.primary, borderColor: colors.primary },
-  durationChipText:   { fontSize: 13, fontWeight: '500', color: colors.textMid },
-  durationChipTextActive: { color: '#fff', fontWeight: '600' },
+  // Duration chip (shared)
+  durationChip:          { backgroundColor: colors.bgDeep, borderRadius: 14, paddingHorizontal: 12, paddingVertical: 6 },
+  durationChipActive:    { backgroundColor: colors.primary },
+  durationChipDisabled:  { opacity: 0.3 },
+  durationChipText:      { fontSize: 12, fontWeight: '400', color: colors.textMid },
+  durationChipTextActive:{ color: '#fff', fontWeight: '500' },
 
   // Save modal
   modalBackdrop: { flex: 1, backgroundColor: 'rgba(0,0,0,0.4)', justifyContent: 'center', alignItems: 'center', padding: 24 },

@@ -1,4 +1,5 @@
 import React, { useEffect, useState, useCallback } from 'react';
+import { HomeIcon } from '../components/Icons';
 import { View, Text, TouchableOpacity, StyleSheet, ScrollView, ActivityIndicator, RefreshControl, Alert } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { colors } from '../theme';
@@ -156,7 +157,9 @@ export default function RoutesScreen({ navigation, route }) {
             <Text style={s.backText}>{'\u2039'}</Text>
           </TouchableOpacity>
           <Text style={s.navTitle}>Routes</Text>
-          <Text style={s.navRight}>{routes.length} options</Text>
+          <TouchableOpacity onPress={() => navigation.navigate('Home')} style={s.homeBtn}>
+            <HomeIcon size={22} color={colors.good} />
+          </TouchableOpacity>
         </View>
 
         {/* Map with all routes */}
@@ -354,6 +357,7 @@ const s = StyleSheet.create({
   backText: { fontSize: 22, color: colors.good },
   navTitle: { flex: 1, fontSize: 15, fontWeight: '600', color: colors.text, marginLeft: 4 },
   navRight: { fontSize: 10.5, fontWeight: '300', color: colors.textMuted },
+  homeBtn:     { paddingHorizontal: 8, paddingVertical: 4, alignItems: 'center', justifyContent: 'center' },
   sheet: { flex: 1 },
   // Conditions
   conditionsCard: { marginHorizontal: 12, marginBottom: 8, backgroundColor: colors.white, borderRadius: 9, borderWidth: 1, borderColor: colors.borderLight, overflow: 'hidden' },

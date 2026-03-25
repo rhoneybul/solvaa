@@ -89,7 +89,7 @@ export default function SignInScreen({ navigation }) {
         <Animated.View style={[s.content, { opacity: fadeAnim, transform: [{ translateY: slideAnim }] }]}>
 
           <PaddleLogo />
-          <Text style={s.title}>Paddle</Text>
+          <Text style={s.title}>Solvaa</Text>
           <Text style={s.tagline}>Know the water before you go</Text>
 
           <View style={s.divider} />

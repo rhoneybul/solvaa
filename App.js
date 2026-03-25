@@ -4,7 +4,14 @@ import { createStackNavigator } from '@react-navigation/stack';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { StatusBar } from 'expo-status-bar';
 import { Platform } from 'react-native';
+import * as Sentry from '@sentry/react-native';
 import { getSession } from './src/services/authService';
+
+Sentry.init({
+  dsn: process.env.EXPO_PUBLIC_SENTRY_DSN,
+  enabled: true,                // off in local dev, on in TestFlight + production
+  tracesSampleRate: 0.2,        // capture 20% of transactions for performance
+});
 
 import SignInScreen       from './src/screens/SignInScreen';
 import HomeScreen         from './src/screens/HomeScreen';
@@ -37,7 +44,7 @@ const slide = ({ current, layouts }) => ({
   },
 });
 
-export default function App() {
+export default Sentry.wrap(function App() {
   const [initialRoute, setInitialRoute] = useState(null);
 
   useEffect(() => {
@@ -78,4 +85,4 @@ export default function App() {
       </WebWrapper>
     </SafeAreaProvider>
   );
-}
+});
