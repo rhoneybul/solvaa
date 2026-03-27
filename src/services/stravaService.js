@@ -11,7 +11,7 @@ const ATHLETE_KEY = 'STRAVA_ATHLETE';
 const MOBILE_REDIRECT = 'paddle://auth/strava';
 // Web redirect must also be registered in your Strava API settings at
 // https://www.strava.com/settings/api → Authorization Callback Domain
-const WEB_REDIRECT = typeof window !== 'undefined' ? window.location.origin : '';
+const WEB_REDIRECT = typeof window !== 'undefined' && window.location ? window.location.origin : '';
 
 const REDIRECT_URI = Platform.OS === 'web' ? WEB_REDIRECT : MOBILE_REDIRECT;
 const SCOPE = 'read,activity:read';

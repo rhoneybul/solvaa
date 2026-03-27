@@ -38,7 +38,7 @@ async function oAuthSignIn(provider) {
     // detectSessionInUrl: true will pick up the session on return.
     const { data, error } = await supabase.auth.signInWithOAuth({
       provider,
-      options: { redirectTo: window.location.origin },
+      options: { redirectTo: window.location?.origin ?? '' },
     });
     if (error) throw error;
     return data;
