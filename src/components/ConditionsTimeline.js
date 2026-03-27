@@ -11,10 +11,11 @@
  *   endHour      number      only show hours <= endHour (optional)
  *   routeBearing number|null from gpxRouteBearing()
  */
+import { useState } from 'react';
 import { View, Text, ScrollView, StyleSheet } from 'react-native';
 import { colors } from '../theme';
 
-const COL_W    = 52;
+const COL_W    = 54;
 const BAR_MAX  = 40;   // px height of tallest bar
 const LABEL_W  = 52;   // width of the fixed left-label column
 const ROW_HEIGHTS = {
@@ -71,7 +72,8 @@ function RowLabel({ label, height, sub }) {
 
 // ── Single time column ────────────────────────────────────────────────────────
 
-function TimeColumn({ h, routeBearing, minTemp, maxTemp, hasMarine }) {
+function TimeColumn({ h, routeBearing, minTemp, maxTemp, hasMarine, colWidth = COL_W }) {
+  const barW = Math.max(18, Math.floor(colWidth * 0.5));
   const spd   = h.windSpeed ?? 0;
   const rel   = relWind(h.windDir, routeBearing);
   const wCol  = windBarColor(spd);
@@ -92,7 +94,7 @@ function TimeColumn({ h, routeBearing, minTemp, maxTemp, hasMarine }) {
   const wDir   = h.swellDir ?? h.waveDir;
 
   return (
-    <View style={[s.col, { width: COL_W }]}>
+    <View style={[s.col, { width: colWidth }]}>
 
       {/* Wind row */}
       <View style={[s.cell, { height: ROW_HEIGHTS.wind }]}>
@@ -100,7 +102,7 @@ function TimeColumn({ h, routeBearing, minTemp, maxTemp, hasMarine }) {
           ? <View style={[s.arrowWrap, arrowStyle(h.windDir)]}><Text style={[s.arrow, { color: wCol }]}>↑</Text></View>
           : <View style={s.arrowWrap} />}
         <View style={s.barWrap}>
-          <View style={[s.bar, { height: wBarH, backgroundColor: wCol }]} />
+          <View style={[s.bar, { height: wBarH, width: barW, backgroundColor: wCol }]} />
         </View>
         <Text style={[s.val, { color: wCol }]}>{Math.round(spd)}kt</Text>
         <Text style={s.sub}>{h.windDirLabel || '—'}</Text>
@@ -114,7 +116,7 @@ function TimeColumn({ h, routeBearing, minTemp, maxTemp, hasMarine }) {
       {/* Temp row */}
       <View style={[s.cell, { height: ROW_HEIGHTS.temp }]}>
         <View style={s.barWrap}>
-          <View style={[s.bar, { height: tBarH, backgroundColor: tCol + 'cc' }]} />
+          <View style={[s.bar, { height: tBarH, width: barW, backgroundColor: tCol + 'cc' }]} />
         </View>
         <Text style={[s.val, { color: colors.textMid }]}>{temp}°</Text>
       </View>
@@ -122,7 +124,7 @@ function TimeColumn({ h, routeBearing, minTemp, maxTemp, hasMarine }) {
       {/* Rain row */}
       <View style={[s.cell, { height: ROW_HEIGHTS.rain }]}>
         <View style={s.barWrap}>
-          <View style={[s.bar, { height: rBarH, backgroundColor: rCol }]} />
+          <View style={[s.bar, { height: rBarH, width: barW, backgroundColor: rCol }]} />
         </View>
         <Text style={[s.val, { color: colors.textMuted }]}>{pp}%</Text>
       </View>
@@ -134,7 +136,7 @@ function TimeColumn({ h, routeBearing, minTemp, maxTemp, hasMarine }) {
             ? <View style={[s.arrowWrap, arrowStyle(wDir)]}><Text style={[s.arrow, { color: wCol2 }]}>↑</Text></View>
             : <View style={s.arrowWrap} />}
           <View style={s.barWrap}>
-            <View style={[s.bar, { height: wBarH2, backgroundColor: wCol2 }]} />
+            <View style={[s.bar, { height: wBarH2, width: barW, backgroundColor: wCol2 }]} />
           </View>
           <Text style={[s.val, { color: wCol2 }]}>{wh != null ? wh.toFixed(1) : '—'}m</Text>
           {h.wavePeriod != null
@@ -158,6 +160,7 @@ function TimeColumn({ h, routeBearing, minTemp, maxTemp, hasMarine }) {
 // ── Main component ────────────────────────────────────────────────────────────
 
 export default function ConditionsTimeline({ hourly = [], date, startHour, endHour, routeBearing }) {
+  const [scrollW, setScrollW] = useState(0);
   const slots = hourly.filter(h => {
     if (!h.time) return false;
     if (date) { if (h.time.slice(0, 10) !== date) return false; }
@@ -204,17 +207,24 @@ export default function ConditionsTimeline({ hourly = [], date, startHour, endHo
           showsHorizontalScrollIndicator={false}
           style={s.scrollArea}
           contentContainerStyle={s.scrollContent}
+          onLayout={e => setScrollW(e.nativeEvent.layout.width)}
         >
-          {display.map((h, i) => (
-            <TimeColumn
-              key={i}
-              h={h}
-              routeBearing={routeBearing}
-              minTemp={minTemp}
-              maxTemp={maxTemp}
-              hasMarine={hasMarine}
-            />
-          ))}
+          {display.map((h, i) => {
+            const colWidth = scrollW > 0
+              ? Math.max(COL_W, Math.floor((scrollW - (display.length - 1) * 2) / display.length))
+              : COL_W;
+            return (
+              <TimeColumn
+                key={i}
+                h={h}
+                routeBearing={routeBearing}
+                minTemp={minTemp}
+                maxTemp={maxTemp}
+                hasMarine={hasMarine}
+                colWidth={colWidth}
+              />
+            );
+          })}
         </ScrollView>
 
       </View>

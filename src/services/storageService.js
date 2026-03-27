@@ -18,6 +18,7 @@ const KEYS = {
   PROFILE:       'PADDLE_PROFILE',
   SAVED_ROUTES:  'PADDLE_SAVED_ROUTES',
   FAVORITES_QUEUE: 'PADDLE_FAVORITES_QUEUE',
+  SAVED_SEARCHES: 'PADDLE_SAVED_SEARCHES',
 };
 
 // ── Active trip (in-progress paddle) ─────────────────────────────────────────
@@ -296,6 +297,16 @@ export async function saveRoute(route, customName) {
   }
 }
 
+/** Update only waypoints / distance / duration on an existing saved route, preserving all other fields. */
+export async function updateRouteWaypoints(id, { waypoints, distanceKm, estimated_duration }) {
+  const cached = await AsyncStorage.getItem(KEYS.SAVED_ROUTES);
+  const routes = cached ? JSON.parse(cached) : [];
+  const idx = routes.findIndex(r => r.id === id);
+  if (idx < 0) return;
+  routes[idx] = { ...routes[idx], waypoints, distanceKm, estimated_duration };
+  await AsyncStorage.setItem(KEYS.SAVED_ROUTES, JSON.stringify(routes));
+}
+
 export async function deleteSavedRoute(id) {
   const cached = await AsyncStorage.getItem(KEYS.SAVED_ROUTES);
   const routes = cached ? JSON.parse(cached) : [];
@@ -306,6 +317,39 @@ export async function deleteSavedRoute(id) {
   if (serverId) {
     try { await api.savedRoutes.delete(serverId); } catch (_) {}
   }
+}
+
+// ── Saved searches (plan results bookmarks) ───────────────────────────────────
+
+export async function saveSearch(search) {
+  const raw = await AsyncStorage.getItem(KEYS.SAVED_SEARCHES);
+  const searches = raw ? JSON.parse(raw) : [];
+  const entry = {
+    id:             Date.now().toString(),
+    savedAt:        Date.now(),
+    location:       search.location || '',
+    locationCoords: search.locationCoords || null,
+    minDurationHrs: search.minDurationHrs || 2,
+    maxDurationHrs: search.maxDurationHrs || 4,
+    plan:           search.plan || null,
+  };
+  searches.unshift(entry);
+  await AsyncStorage.setItem(KEYS.SAVED_SEARCHES, JSON.stringify(searches.slice(0, 20)));
+  return entry;
+}
+
+export async function getSavedSearches() {
+  const raw = await AsyncStorage.getItem(KEYS.SAVED_SEARCHES);
+  return raw ? JSON.parse(raw) : [];
+}
+
+export async function deleteSavedSearch(id) {
+  const raw = await AsyncStorage.getItem(KEYS.SAVED_SEARCHES);
+  const searches = raw ? JSON.parse(raw) : [];
+  await AsyncStorage.setItem(
+    KEYS.SAVED_SEARCHES,
+    JSON.stringify(searches.filter(s => s.id !== id)),
+  );
 }
 
 // ── Favorites queue (offline-safe toggling) ──────────────────────────────────

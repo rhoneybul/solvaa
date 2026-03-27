@@ -2,7 +2,8 @@ import { useState, useRef, useEffect, useCallback, useMemo } from 'react';
 import { HomeIcon } from '../components/Icons';
 import {
   View, Text, TextInput, TouchableOpacity, StyleSheet,
-  ScrollView, Animated, Keyboard, Alert, Platform, Modal, RefreshControl, ActivityIndicator,
+  ScrollView, Animated, Keyboard, Alert, Platform, Modal, RefreshControl, ActivityIndicator, Image,
+  useWindowDimensions,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import * as Location from 'expo-location';
@@ -14,11 +15,11 @@ import {
 import PaddleMap from '../components/PaddleMap';
 import ConditionsTimeline from '../components/ConditionsTimeline';
 import { gpxRouteBearing } from '../components/PaddleMap';
-import { planPaddleWithWeather, hasApiKey, refineRoute } from '../services/claudeService';
+import { planPaddleWithWeather, hasApiKey, refineRoute, askSafety } from '../services/claudeService';
 import { SKILL_LEVELS, getStravaTokens, fetchStravaActivities, inferSkillFromStrava } from '../services/stravaService';
 import { searchLocations, MIN_SEARCH_LENGTH, SEARCH_DEBOUNCE_MS } from '../services/geocodingService';
 import { getWeatherWithCache } from '../services/weatherService';
-import { saveRoute, getSavedRoutes, deleteSavedRoute } from '../services/storageService';
+import { saveRoute, getSavedRoutes, deleteSavedRoute, saveSearch, deleteSavedSearch } from '../services/storageService';
 import {
   validateMaritimeRoute,
   normaliseWaypointCoords,
@@ -98,7 +99,7 @@ function dateToString(d) {
 }
 
 
-export default function PlannerScreen({ navigation }) {
+export default function PlannerScreen({ navigation, route: navRoute }) {
   // Optional free-text nudge
   const [nudge, setNudge] = useState('');
 
@@ -156,6 +157,54 @@ export default function PlannerScreen({ navigation }) {
 
   // Pull to refresh (Ticket 5)
   const [refreshing, setRefreshing] = useState(false);
+
+  const [drawMode, setDrawMode]         = useState(false);
+  const [drawnPoints, setDrawnPoints]   = useState([]);
+  const [searchSaved, setSearchSaved]   = useState(false);
+  const [savedSearchId, setSavedSearchId] = useState(null);
+  const [editingRouteName, setEditingRouteName] = useState(false);
+  const [routeNameInput, setRouteNameInput]     = useState('');
+  const { height: screenHeight }        = useWindowDimensions();
+  const [mapExpanded, setMapExpanded] = useState(false);
+  const mapHeightAnim = useRef(new Animated.Value(260)).current;
+
+  useEffect(() => {
+    const toValue = drawMode
+      ? Math.round(screenHeight * 0.64)
+      : mapExpanded
+        ? Math.round(screenHeight * 0.52)
+        : 260;
+    Animated.spring(mapHeightAnim, {
+      toValue,
+      useNativeDriver: false,
+      tension: 60,
+      friction: 12,
+    }).start();
+  }, [drawMode, mapExpanded]);
+
+  // Ask AI
+  const [askText, setAskText]           = useState('');
+  const [askLoading, setAskLoading]     = useState(false);
+  const [askAnswer, setAskAnswer]       = useState(null);
+
+  // Refine search
+  const [refineText, setRefineText]     = useState('');
+  const [refineOpen, setRefineOpen]     = useState(false);
+
+  // Restore a saved search if navigated from SavedSearchesScreen
+  useEffect(() => {
+    const saved = navRoute?.params?.savedSearch;
+    if (!saved) return;
+    setDestination(saved.location || '');
+    setLocationCoords(saved.locationCoords || null);
+    if (saved.minDurationHrs) setMinDurationHrs(saved.minDurationHrs);
+    if (saved.maxDurationHrs) setMaxDurationHrs(saved.maxDurationHrs);
+    if (saved.plan) {
+      setPlan(saved.plan);
+      setSearchSaved(true);
+      fadeAnim.setValue(1);
+    }
+  }, [navRoute?.params?.savedSearch]);
 
   // Load saved routes to know which are favorited
   const loadSavedRouteNames = useCallback(async () => {
@@ -284,11 +333,17 @@ export default function PlannerScreen({ navigation }) {
     setPlan(null);
     setPlanError(null);
     fadeAnim.setValue(0);
-    setSelectedRouteIdx(0);
+    setSelectedRouteIdx(-1);
     setExpandedRoute(-1);
     setResultsDate(null);
     setLoadingPct(0);
     setLoadingMsg(LOADING_MESSAGES[0]);
+    setSearchSaved(false);
+    setSavedSearchId(null);
+    setDrawMode(false);
+    setDrawnPoints([]);
+    setAskAnswer(null);
+    setAskText('');
 
     let msgIdx = 0;
     loadingMsgRef.current = setInterval(() => {
@@ -337,9 +392,85 @@ export default function PlannerScreen({ navigation }) {
     }
   };
 
+  const handleRefine = async () => {
+    if (!refineText.trim()) return;
+    Keyboard.dismiss();
+    setNudge(prev => (prev.trim() ? `${prev.trim()}. ${refineText.trim()}` : refineText.trim()));
+    setRefineText('');
+    setRefineOpen(false);
+    // Re-run generate with the new nudge baked in via the updated state
+    // We call planPaddleWithWeather directly with the augmented prompt
+    const travelLabel = MAX_TRAVEL_OPTIONS.find(o => o.value === maxTravelMins)?.label ?? 'any distance';
+    const parts = [
+      `I'm near ${destination}`,
+      `I want to paddle for between ${minDurationHrs} and ${maxDurationHrs} hour${maxDurationHrs > 1 ? 's' : ''}`,
+    ];
+    if (maxTravelMins < 9999) parts.push(`I can travel up to ${travelLabel} to reach the launch point`);
+    if (previousPaddle) parts.push(`My last paddle was "${previousPaddle.name}" (${previousPaddle.distance} km)`);
+    const currentNudge = nudge.trim() ? `${nudge.trim()}. ${refineText.trim()}` : refineText.trim();
+    if (currentNudge) parts.push(currentNudge);
+    const input = parts.join('. ') + '.';
+
+    setLoading(true);
+    setPlan(null);
+    setPlanError(null);
+    fadeAnim.setValue(0);
+    setSelectedRouteIdx(-1);
+    setExpandedRoute(-1);
+    setResultsDate(null);
+    setLoadingPct(0);
+    setLoadingMsg(LOADING_MESSAGES[0]);
+    setSearchSaved(false);
+    setSavedSearchId(null);
+    setDrawMode(false);
+    setDrawnPoints([]);
+    setAskAnswer(null);
+    setAskText('');
+
+    let msgIdx = 0;
+    loadingMsgRef.current = setInterval(() => {
+      msgIdx = (msgIdx + 1) % LOADING_MESSAGES.length;
+      setLoadingMsg(LOADING_MESSAGES[msgIdx]);
+      setLoadingPct(prev => Math.min(90, prev + 12));
+    }, 4000);
+
+    try {
+      const result = await planPaddleWithWeather({
+        prompt: input,
+        lat: locationCoords?.lat,
+        lon: locationCoords?.lng,
+        minDurationHrs,
+        maxDurationHrs,
+        maxTravelMins: maxTravelMins < 9999 ? maxTravelMins : undefined,
+        location: locationCoords ? { lat: locationCoords.lat, lng: locationCoords.lng } : undefined,
+      });
+      if (result.routes) {
+        result.routes = result.routes.map(r => ({
+          ...r,
+          waypoints: r.waypoints,
+          _maritimeValidation: validateMaritimeRoute(r.waypoints || [], { maxSegmentKm: 10, declaredDistKm: r.distanceKm, skillKey: skillLevel?.key }),
+          _launchPoint: getRouteLaunchPoint(r),
+        }));
+      }
+      setPlan(result);
+      setLoadingPct(100);
+      Animated.timing(fadeAnim, { toValue: 1, duration: 500, useNativeDriver: true }).start();
+    } catch (e) {
+      setPlanError(e);
+    } finally {
+      clearInterval(loadingMsgRef.current);
+      loadingMsgRef.current = null;
+      setLoading(false);
+    }
+  };
+
   const reset = () => {
     setPlan(null); setPlanError(null); setPrompt(''); fadeAnim.setValue(0);
     setSelectedRouteIdx(0); setExpandedRoute(-1); setResultsDate(null);
+    setDrawMode(false); setDrawnPoints([]);
+    setSearchSaved(false); setSavedSearchId(null);
+    setRefineText(''); setRefineOpen(false);
+    setMapExpanded(false);
   };
 
   const difficultyColor = (d) => {
@@ -352,6 +483,54 @@ export default function PlannerScreen({ navigation }) {
 
   // Check if a route is favorited
   const isRouteFavorited = (routeName) => savedRouteNames.has(routeName);
+
+  const handleFinishDraw = () => {
+    if (drawnPoints.length < 2) return;
+    const distKm = drawnPoints.reduce((acc, pt, i) => {
+      if (i === 0) return 0;
+      const a = drawnPoints[i - 1], b = pt;
+      const R = 6371;
+      const dLat = (b.lat - a.lat) * Math.PI / 180;
+      const dLon = (b.lon - a.lon) * Math.PI / 180;
+      const s = Math.sin(dLat/2)**2 + Math.cos(a.lat*Math.PI/180)*Math.cos(b.lat*Math.PI/180)*Math.sin(dLon/2)**2;
+      return acc + R * 2 * Math.atan2(Math.sqrt(s), Math.sqrt(1-s));
+    }, 0);
+    const timeHrs = distKm / 4;
+    const newWaypoints = drawnPoints.map(p => [p.lat, p.lon]);
+
+    if (selectedRouteIdx >= 0) {
+      // Update the selected suggestion in place — don't create a new route
+      const updated = [...routes];
+      updated[selectedRouteIdx] = {
+        ...updated[selectedRouteIdx],
+        waypoints: newWaypoints,
+        distanceKm: parseFloat(distKm.toFixed(1)),
+        estimated_duration: parseFloat(timeHrs.toFixed(1)),
+        isDrawn: true,
+      };
+      setPlan(prev => ({ ...prev, routes: updated }));
+      setDrawnPoints([]);
+      setDrawMode(false);
+    } else {
+      // Overview / no selection — open save modal for a new custom route
+      const drawnRoute = {
+        name: 'Custom Route',
+        isDrawn: true,
+        waypoints: newWaypoints,
+        distanceKm: parseFloat(distKm.toFixed(1)),
+        estimated_duration: parseFloat(timeHrs.toFixed(1)),
+        location: destination,
+        locationCoords,
+        difficulty: 'custom',
+        description: `Hand-drawn route. ${distKm.toFixed(1)} km, ~${timeHrs < 1 ? Math.round(timeHrs * 60) + ' min' : timeHrs.toFixed(1) + 'h'} paddle.`,
+        highlights: [],
+        launchPoint: '',
+        travelTimeMin: 0,
+      };
+      setSaveModalRoute(drawnRoute);
+      setSaveNameInput('Custom Route');
+    }
+  };
 
   const handleToggleFavorite = (routeData) => {
     const name = routeData.name || '';
@@ -377,8 +556,8 @@ export default function PlannerScreen({ navigation }) {
         ]);
       }
     } else {
-      // Open save modal so user can confirm/edit the name
-      setSaveModalRoute(routeData);
+      // Open save modal — strip isDrawn so saving doesn't re-add to plan.routes
+      setSaveModalRoute({ ...routeData, isDrawn: false });
       setSaveNameInput(name);
     }
   };
@@ -603,7 +782,7 @@ export default function PlannerScreen({ navigation }) {
   if (loading) {
     return (
       <View style={[s.container, s.centered]}>
-        <View style={s.logoBadge}><Text style={s.logoEmoji}>{'\uD83D\uDEF6'}</Text></View>
+        <Image source={require('../../assets/icons/ios/AppIcon-1024.png')} style={s.logoBadge} />
         <Text style={s.loadTitle}>Planning your paddle{'\u2026'}</Text>
         <Text style={s.loadPrompt} numberOfLines={2}>
           {`${destination} · ${minDurationHrs}–${maxDurationHrs}h paddle`}
@@ -620,6 +799,18 @@ export default function PlannerScreen({ navigation }) {
   }
 
   // ── RESULTS ───────────────────────────────────────────────────────────────
+  const drawnDistKm = drawnPoints.length >= 2
+    ? drawnPoints.reduce((acc, pt, i) => {
+        if (i === 0) return 0;
+        const a = drawnPoints[i - 1], b = pt;
+        const R = 6371;
+        const dLat = (b.lat - a.lat) * Math.PI / 180;
+        const dLon = (b.lon - a.lon) * Math.PI / 180;
+        const s = Math.sin(dLat/2)**2 + Math.cos(a.lat*Math.PI/180)*Math.cos(b.lat*Math.PI/180)*Math.sin(dLon/2)**2;
+        return acc + R * 2 * Math.atan2(Math.sqrt(s), Math.sqrt(1-s));
+      }, 0)
+    : 0;
+  const drawnTimeHrs = drawnDistKm / 4; // ~4 km/h average paddling speed
   const routes  = plan.routes  || [];
   const sel     = routes[selectedRouteIdx] || {};
 
@@ -630,22 +821,155 @@ export default function PlannerScreen({ navigation }) {
           <TouchableOpacity onPress={reset} style={s.back}>
             <Text style={s.backText}>{'\u2039'}</Text>
           </TouchableOpacity>
-          <Text style={s.navTitle}>{plan.location?.base || 'Your Routes'}</Text>
+          {selectedRouteIdx >= 0 && editingRouteName ? (
+            <TextInput
+              style={s.navTitleInput}
+              value={routeNameInput}
+              onChangeText={setRouteNameInput}
+              autoFocus
+              returnKeyType="done"
+              onSubmitEditing={() => {
+                const trimmed = routeNameInput.trim();
+                if (trimmed) {
+                  const updated = [...routes];
+                  updated[selectedRouteIdx] = { ...updated[selectedRouteIdx], name: trimmed };
+                  setPlan(prev => ({ ...prev, routes: updated }));
+                }
+                setEditingRouteName(false);
+              }}
+              onBlur={() => setEditingRouteName(false)}
+            />
+          ) : selectedRouteIdx >= 0 ? (
+            <TouchableOpacity style={s.navTitleBtn} onPress={() => { setRouteNameInput(sel.name || ''); setEditingRouteName(true); }} activeOpacity={0.7}>
+              <Text style={s.navTitle} numberOfLines={1}>{sel.name || 'Route'}</Text>
+              <Text style={s.navTitlePencil}>✎</Text>
+            </TouchableOpacity>
+          ) : (
+            <Text style={s.navTitle}>{plan.location?.base || 'Your Routes'}</Text>
+          )}
+          <View style={{ width: 8 }} />
+          <TouchableOpacity
+            style={[s.saveSearchBtn, searchSaved && s.saveSearchBtnSaved]}
+            onPress={async () => {
+              if (searchSaved) {
+                try {
+                  if (savedSearchId) await deleteSavedSearch(savedSearchId);
+                  setSearchSaved(false);
+                  setSavedSearchId(null);
+                } catch { /* ignore */ }
+                return;
+              }
+              try {
+                const entry = await saveSearch({ location: destination, locationCoords, minDurationHrs, maxDurationHrs, plan });
+                setSearchSaved(true);
+                setSavedSearchId(entry?.id ?? null);
+              } catch { /* ignore */ }
+            }}
+            activeOpacity={0.7}
+          >
+            <Text style={[s.saveSearchIcon, searchSaved && s.saveSearchIconSaved]}>
+              {searchSaved ? '✕' : '⌕'}
+            </Text>
+          </TouchableOpacity>
           <TouchableOpacity onPress={() => navigation.navigate('Home')} style={s.homeBtn}>
             <HomeIcon size={22} color={colors.primary} />
           </TouchableOpacity>
         </View>
 
-        {/* Map */}
-        <View>
+        {/* Map — animates taller when expanded or drawing */}
+        <Animated.View style={{ height: mapHeightAnim, overflow: 'hidden' }}>
           <PaddleMap
-            height={220}
+            height={drawMode ? Math.round(screenHeight * 0.64) : mapExpanded ? Math.round(screenHeight * 0.52) : 260}
             coords={locationCoords ? { lat: locationCoords.lat, lon: locationCoords.lng } : undefined}
             routes={routes}
             selectedIdx={selectedRouteIdx}
-            overlayTitle={sel.name}
-            overlayMeta={sel.launchPoint || plan.location?.base}
+            overlayMeta={selectedRouteIdx >= 0 ? (sel.launchPoint || plan.location?.base) : undefined}
+            drawMode={drawMode}
+            drawnPoints={drawnPoints}
+            onAddPoint={pt => setDrawnPoints(prev => [...prev, pt])}
+            onMovePoint={(idx, pt) => setDrawnPoints(prev => prev.map((p, i) => i === idx ? pt : p))}
+            windHourly={weatherData?.hourly || []}
+            windDate={resultsDate}
+            onWindDateChange={setResultsDate}
           />
+          {/* Draw stats overlay — top of map, semi-transparent */}
+          {drawMode && drawnPoints.length > 0 && (
+            <View style={s.drawStatsOverlay}>
+              <Text style={s.drawStatsText}>
+                {drawnDistKm.toFixed(1)} km
+                {'  ·  '}
+                {drawnTimeHrs < 1 ? `~${Math.round(drawnTimeHrs * 60)} min` : `~${drawnTimeHrs.toFixed(1)} h`}
+              </Text>
+            </View>
+          )}
+          {/* Expand / collapse toggle */}
+          {!drawMode && (
+            <TouchableOpacity
+              style={s.mapExpandBtn}
+              onPress={() => setMapExpanded(e => !e)}
+              activeOpacity={0.75}
+            >
+              <Text style={s.mapExpandBtnText}>{mapExpanded ? '⌃' : '⌄'}</Text>
+            </TouchableOpacity>
+          )}
+        </Animated.View>
+
+        {/* Draw controls */}
+        <View style={selectedRouteIdx === -1 && !drawMode && drawnPoints.length === 0 ? s.drawCtaBar : s.drawBar}>
+          {selectedRouteIdx === -1 && !drawMode && drawnPoints.length === 0 ? (
+            <TouchableOpacity style={s.drawCta} onPress={() => setDrawMode(true)} activeOpacity={0.8}>
+              <Text style={s.drawCtaIcon}>✦</Text>
+              <View style={s.drawCtaTextWrap}>
+                <Text style={s.drawCtaTitle}>Draw your own route</Text>
+                <Text style={s.drawCtaSub}>Tap a route above to view details, or draw directly on the map</Text>
+              </View>
+              <Text style={s.drawCtaArrow}>›</Text>
+            </TouchableOpacity>
+          ) : (
+            <TouchableOpacity
+              style={[s.drawToggle, drawMode && s.drawClearBtn]}
+              onPress={() => {
+                if (drawMode) {
+                  setDrawnPoints([]);
+                  setDrawMode(false);
+                } else {
+                  if (selectedRouteIdx >= 0) {
+                    const selRoute = routes[selectedRouteIdx];
+                    const pts = (Array.isArray(selRoute?.waypoints) ? selRoute.waypoints : [])
+                      .map(w => Array.isArray(w) ? { lat: w[0], lon: w[1] } : w)
+                      .filter(p => p?.lat != null && p?.lon != null);
+                    setDrawnPoints(pts);
+                  }
+                  setDrawMode(true);
+                }
+              }}
+              activeOpacity={0.85}
+            >
+              <Text style={[s.drawToggleText, drawMode && s.drawClearBtnText]}>
+                {drawMode ? 'Clear' : 'Draw route'}
+              </Text>
+            </TouchableOpacity>
+          )}
+
+          {drawMode && (
+            <View style={{ flex: 1, flexDirection: 'row', alignItems: 'center', gap: 6, justifyContent: 'flex-end' }}>
+              <TouchableOpacity style={s.drawAction} onPress={() => setDrawnPoints(p => p.slice(0, -1))} activeOpacity={0.7}>
+                <Text style={s.drawActionText}>Undo</Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={s.drawAction}
+                onPress={() => drawnPoints.length > 0 && setDrawnPoints(p => [...p, p[0]])}
+                activeOpacity={0.7}
+              >
+                <Text style={s.drawActionText}>Loop</Text>
+              </TouchableOpacity>
+            </View>
+          )}
+          {drawMode && drawnPoints.length >= 2 && (
+            <TouchableOpacity style={s.drawFinish} onPress={handleFinishDraw} activeOpacity={0.85}>
+              <Text style={s.drawFinishText}>Finish</Text>
+            </TouchableOpacity>
+          )}
         </View>
 
         {/* Vertical scrollable route list */}
@@ -662,125 +986,47 @@ export default function PlannerScreen({ navigation }) {
             />
           }
         >
-          {/* Route cards — primary focus */}
-          {routes.map((r, i) => {
-            const dc        = difficultyColor(r.difficulty_rating || r.difficulty);
-            const isActive  = selectedRouteIdx === i;
-            const isEditing = editingRouteIdx === i;
-            return (
-              <TouchableOpacity
-                key={i}
-                style={[s.routeCard, isActive && s.routeCardSel]}
-                onPress={() => { setSelectedRouteIdx(i); setEditingRouteIdx(-1); }}
-                activeOpacity={0.85}
-              >
-                {/* Single compact row: name + meta + heart */}
-                <View style={s.routeRow}>
-                  <View style={[s.diffDot, { backgroundColor: dc.fg }]} />
-                  <View style={{ flex: 1 }}>
-                    <Text style={s.routeName} numberOfLines={1}>{r.name}</Text>
-                    <Text style={s.routeMeta}>
-                      {[
-                        r.distanceKm ? `${r.distanceKm} km` : null,
-                        r.estimated_duration ? `~${r.estimated_duration}h paddle` : null,
-                        r.travelTimeMin ? (r.travelTimeMin >= 60
-                          ? `${Math.floor(r.travelTimeMin / 60)}h${r.travelTimeMin % 60 ? ` ${r.travelTimeMin % 60}m` : ''} drive`
-                          : `${r.travelTimeMin} min drive`) : null,
-                        r.difficulty_rating || r.difficulty || null,
-                      ].filter(Boolean).join('  ·  ')}
-                    </Text>
-                  </View>
-                  <HeartIcon
-                    filled={isRouteFavorited(r.name)}
-                    size={20}
-                    onPress={() => handleToggleFavorite({ ...r, location: plan.location?.base || destination, locationCoords })}
-                  />
-                </View>
+          {/* Conditions — above routes */}
+          {/* Refine search */}
+          {refineOpen ? (
+            <View style={s.refineSearchBox}>
+              <TextInput
+                style={s.refineSearchInput}
+                value={refineText}
+                onChangeText={setRefineText}
+                placeholder="e.g. make it shorter, coastal only, avoid busy areas…"
+                placeholderTextColor={colors.textFaint}
+                autoFocus
+                returnKeyType="done"
+                onSubmitEditing={handleRefine}
+              />
+              <View style={s.refineSearchBtns}>
+                <TouchableOpacity style={s.refineSearchCancel} onPress={() => { setRefineOpen(false); setRefineText(''); }} activeOpacity={0.7}>
+                  <Text style={s.refineSearchCancelText}>Cancel</Text>
+                </TouchableOpacity>
+                <TouchableOpacity
+                  style={[s.refineSearchGo, !refineText.trim() && s.refineSearchGoDisabled]}
+                  disabled={!refineText.trim()}
+                  onPress={handleRefine}
+                  activeOpacity={0.85}
+                >
+                  <Text style={s.refineSearchGoText}>Regenerate →</Text>
+                </TouchableOpacity>
+              </View>
+            </View>
+          ) : (
+            <TouchableOpacity style={s.refineSearchBar} onPress={() => setRefineOpen(true)} activeOpacity={0.7}>
+              <Text style={s.refineSearchBarLabel}>
+                {destination}
+                {'  ·  '}
+                {minDurationHrs === maxDurationHrs ? `${minDurationHrs}h` : `${minDurationHrs}–${maxDurationHrs}h`}
+                {nudge.trim() ? `  ·  ${nudge.trim()}` : ''}
+              </Text>
+              <Text style={s.refineSearchBarEdit}>Edit</Text>
+            </TouchableOpacity>
+          )}
 
-                {/* Description — only when selected */}
-                {isActive && r.description ? (
-                  <Text style={s.routeDescInline}>{r.description}</Text>
-                ) : null}
-
-                {/* Navigate button — only when selected */}
-                {isActive && r._launchPoint && (
-                  <TouchableOpacity
-                    style={s.navigateBtn}
-                    onPress={() => {
-                      const url = buildNavigateToStartUrl(r._launchPoint.lat, r._launchPoint.lon);
-                      if (Platform.OS === 'web') { window.open(url, '_blank'); }
-                      else { import('react-native').then(({ Linking }) => Linking.openURL(url)); }
-                    }}
-                    activeOpacity={0.85}
-                  >
-                    <Text style={s.navigateBtnText}>Navigate to Start</Text>
-                  </TouchableOpacity>
-                )}
-
-                {/* Inline refinement — only when selected */}
-                {isActive && isEditing && (
-                  editLoading ? (
-                    <View style={s.refineLoading}>
-                      <ActivityIndicator size="small" color={colors.primary} />
-                      <Text style={s.refineLoadingText}>Refining route…</Text>
-                    </View>
-                  ) : (
-                    <View style={s.refineBox}>
-                      <TextInput
-                        style={s.refineInput}
-                        value={editText}
-                        onChangeText={setEditText}
-                        placeholder='e.g. "Make it shorter" or "Avoid open sea crossings"'
-                        placeholderTextColor={colors.textFaint}
-                        multiline
-                        autoFocus
-                      />
-                      <View style={s.refineActions}>
-                        <TouchableOpacity style={s.refineCancelBtn} onPress={() => { setEditingRouteIdx(-1); setEditText(''); }} activeOpacity={0.7}>
-                          <Text style={s.refineCancelText}>Cancel</Text>
-                        </TouchableOpacity>
-                        <TouchableOpacity
-                          style={[s.refineSubmitBtn, !editText.trim() && s.refineSubmitDisabled]}
-                          disabled={!editText.trim()}
-                          onPress={async () => {
-                            if (!editText.trim()) return;
-                            setEditLoading(true);
-                            try {
-                              const updated = await refineRoute(r, editText.trim());
-                              const newRoutes = [...routes];
-                              newRoutes[i] = { ...r, ...updated, _maritimeValidation: undefined, _launchPoint: getRouteLaunchPoint(updated) };
-                              setPlan(prev => ({ ...prev, routes: newRoutes }));
-                              setEditingRouteIdx(-1);
-                              setEditText('');
-                            } catch (e) {
-                              Alert.alert('Error', e.message || 'Could not refine route.');
-                            } finally {
-                              setEditLoading(false);
-                            }
-                          }}
-                          activeOpacity={0.85}
-                        >
-                          <Text style={s.refineSubmitText}>Apply</Text>
-                        </TouchableOpacity>
-                      </View>
-                    </View>
-                  )
-                )}
-                {isActive && !isEditing && (
-                  <TouchableOpacity
-                    style={s.refineBtn}
-                    onPress={() => { setEditingRouteIdx(i); setEditText(''); }}
-                    activeOpacity={0.7}
-                  >
-                    <Text style={s.refineBtnText}>Edit this route…</Text>
-                  </TouchableOpacity>
-                )}
-              </TouchableOpacity>
-            );
-          })}
-
-          {/* Weather — below routes */}
-          <SectionHeader style={{ marginTop: 8 }}>Conditions</SectionHeader>
+          <SectionHeader style={{ paddingTop: 8 }}>Conditions</SectionHeader>
           <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={s.dateStrip}>
             <TouchableOpacity
               style={[s.dateDayChip, resultsDate === null && s.dateDayChipActive, { minWidth: 52 }]}
@@ -827,8 +1073,216 @@ export default function PlannerScreen({ navigation }) {
               </View>
             )
           )}
+
+          {/* Route cards — primary focus */}
+          {routes.map((r, i) => {
+            const dc        = difficultyColor(r.difficulty_rating || r.difficulty);
+            const isActive  = selectedRouteIdx === i;
+            const isEditing = editingRouteIdx === i;
+            const handleDelete = () => {
+              const newRoutes = routes.filter((_, idx) => idx !== i);
+              setPlan(prev => ({ ...prev, routes: newRoutes }));
+              if (selectedRouteIdx === i) setSelectedRouteIdx(newRoutes.length > 0 ? 0 : -1);
+              else if (selectedRouteIdx > i) setSelectedRouteIdx(prev => prev - 1);
+            };
+            return (
+              <View key={i} style={s.routeCardWrap}>
+                <TouchableOpacity
+                  style={[s.routeCard, isActive && s.routeCardSel]}
+                  onPress={() => { setSelectedRouteIdx(isActive ? -1 : i); setEditingRouteIdx(-1); }}
+                  activeOpacity={0.85}
+                >
+                  {/* Single compact row: name + meta + heart */}
+                  <View style={s.routeRow}>
+                    <View style={[s.diffDot, { backgroundColor: dc.fg }]} />
+                    <View style={{ flex: 1 }}>
+                      <Text style={s.routeName} numberOfLines={1}>{r.name}</Text>
+                      <Text style={s.routeMeta}>
+                        {[
+                          r.distanceKm ? `${r.distanceKm} km` : null,
+                          r.estimated_duration ? `~${r.estimated_duration}h paddle` : null,
+                          r.travelTimeMin ? (r.travelTimeMin >= 60
+                            ? `${Math.floor(r.travelTimeMin / 60)}h${r.travelTimeMin % 60 ? ` ${r.travelTimeMin % 60}m` : ''} drive`
+                            : `${r.travelTimeMin} min drive`) : null,
+                          r.difficulty_rating || r.difficulty || null,
+                        ].filter(Boolean).join('  ·  ')}
+                      </Text>
+                    </View>
+                    <HeartIcon
+                      filled={isRouteFavorited(r.name)}
+                      size={20}
+                      onPress={() => handleToggleFavorite({ ...r, location: plan.location?.base || destination, locationCoords })}
+                    />
+                    {/* spacer for the absolute delete button */}
+                    <View style={{ width: 28 }} />
+                  </View>
+
+                  {/* Description — only when selected */}
+                  {isActive && r.description ? (
+                    <Text style={s.routeDescInline}>{r.description}</Text>
+                  ) : null}
+
+                  {/* Navigate button — only when selected */}
+                  {isActive && r._launchPoint && (
+                    <TouchableOpacity
+                      style={s.navigateBtn}
+                      onPress={() => {
+                        const url = buildNavigateToStartUrl(r._launchPoint.lat, r._launchPoint.lon);
+                        if (Platform.OS === 'web') { window.open(url, '_blank'); }
+                        else { import('react-native').then(({ Linking }) => Linking.openURL(url)); }
+                      }}
+                      activeOpacity={0.85}
+                    >
+                      <Text style={s.navigateBtnText}>Navigate to Start</Text>
+                    </TouchableOpacity>
+                  )}
+
+                  {/* Open full route detail */}
+                  {isActive && (
+                    <TouchableOpacity
+                      style={s.viewRouteBtn}
+                      onPress={() => navigation.navigate('SavedRoutes', {
+                        previewRoute: {
+                          ...r,
+                          location:      plan.location?.base || destination,
+                          locationCoords: locationCoords ? { lat: locationCoords.lat, lng: locationCoords.lng } : null,
+                        },
+                      })}
+                      activeOpacity={0.85}
+                    >
+                      <Text style={s.viewRouteBtnText}>View full route →</Text>
+                    </TouchableOpacity>
+                  )}
+
+                  {/* Inline refinement — only when selected */}
+                  {isActive && isEditing && (
+                    editLoading ? (
+                      <View style={s.refineLoading}>
+                        <ActivityIndicator size="small" color={colors.primary} />
+                        <Text style={s.refineLoadingText}>Refining route…</Text>
+                      </View>
+                    ) : (
+                      <View style={s.refineBox}>
+                        <TextInput
+                          style={s.refineInput}
+                          value={editText}
+                          onChangeText={setEditText}
+                          placeholder='e.g. "Make it shorter" or "Avoid open sea crossings"'
+                          placeholderTextColor={colors.textFaint}
+                          multiline
+                          autoFocus
+                        />
+                        <View style={s.refineActions}>
+                          <TouchableOpacity style={s.refineCancelBtn} onPress={() => { setEditingRouteIdx(-1); setEditText(''); }} activeOpacity={0.7}>
+                            <Text style={s.refineCancelText}>Cancel</Text>
+                          </TouchableOpacity>
+                          <TouchableOpacity
+                            style={[s.refineSubmitBtn, !editText.trim() && s.refineSubmitDisabled]}
+                            disabled={!editText.trim()}
+                            onPress={async () => {
+                              if (!editText.trim()) return;
+                              setEditLoading(true);
+                              try {
+                                const updated = await refineRoute(r, editText.trim());
+                                const newRoutes = [...routes];
+                                newRoutes[i] = { ...r, ...updated, _maritimeValidation: undefined, _launchPoint: getRouteLaunchPoint(updated) };
+                                setPlan(prev => ({ ...prev, routes: newRoutes }));
+                                setEditingRouteIdx(-1);
+                                setEditText('');
+                              } catch (e) {
+                                Alert.alert('Error', e.message || 'Could not refine route.');
+                              } finally {
+                                setEditLoading(false);
+                              }
+                            }}
+                            activeOpacity={0.85}
+                          >
+                            <Text style={s.refineSubmitText}>Apply</Text>
+                          </TouchableOpacity>
+                        </View>
+                      </View>
+                    )
+                  )}
+                  {isActive && !isEditing && (
+                    <TouchableOpacity
+                      style={s.refineBtn}
+                      onPress={() => { setEditingRouteIdx(i); setEditText(''); }}
+                      activeOpacity={0.7}
+                    >
+                      <Text style={s.refineBtnText}>Edit this route…</Text>
+                    </TouchableOpacity>
+                  )}
+                </TouchableOpacity>
+
+                {/* Delete button — outside the card TouchableOpacity to avoid nested press conflicts */}
+                <TouchableOpacity
+                  style={s.routeDeleteBtn}
+                  onPress={handleDelete}
+                  activeOpacity={0.7}
+                  hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+                >
+                  <Text style={s.routeDeleteBtnText}>✕</Text>
+                </TouchableOpacity>
+              </View>
+            );
+          })}
+
           {plan.weatherNote && <AlertBanner type="caution" title="Weather" body={plan.weatherNote} />}
           {plan.safetyNote  && <AlertBanner type="warn"    title="Safety"  body={plan.safetyNote}  />}
+
+          {/* Ask AI */}
+          <SectionHeader style={{ marginTop: 8 }}>Ask about conditions</SectionHeader>
+          <View style={s.askCard}>
+            {askAnswer ? (
+              <>
+                <View style={s.askBubble}>
+                  <Text style={s.askBubbleText}>{askAnswer}</Text>
+                </View>
+                <TouchableOpacity onPress={() => { setAskAnswer(null); setAskText(''); }} style={s.askClear} activeOpacity={0.7}>
+                  <Text style={s.askClearText}>Ask another question</Text>
+                </TouchableOpacity>
+              </>
+            ) : (
+              <View style={s.askRow}>
+                <TextInput
+                  style={s.askInput}
+                  value={askText}
+                  onChangeText={setAskText}
+                  placeholder="e.g. Is it safe to paddle tomorrow morning?"
+                  placeholderTextColor={colors.textFaint}
+                  returnKeyType="send"
+                  onSubmitEditing={async () => {
+                    if (!askText.trim() || askLoading) return;
+                    setAskLoading(true);
+                    try {
+                      const answer = await askSafety({ question: askText.trim(), weather: weatherData, routes });
+                      setAskAnswer(answer);
+                    } catch { setAskAnswer('Sorry, I couldn\'t answer that right now. Please try again.'); }
+                    finally { setAskLoading(false); }
+                  }}
+                  editable={!askLoading}
+                />
+                <TouchableOpacity
+                  style={[s.askBtn, (!askText.trim() || askLoading) && s.askBtnDisabled]}
+                  disabled={!askText.trim() || askLoading}
+                  onPress={async () => {
+                    if (!askText.trim() || askLoading) return;
+                    setAskLoading(true);
+                    try {
+                      const answer = await askSafety({ question: askText.trim(), weather: weatherData, routes });
+                      setAskAnswer(answer);
+                    } catch { setAskAnswer('Sorry, I couldn\'t answer that right now. Please try again.'); }
+                    finally { setAskLoading(false); }
+                  }}
+                  activeOpacity={0.85}
+                >
+                  {askLoading
+                    ? <ActivityIndicator size="small" color="#fff" />
+                    : <Text style={s.askBtnText}>Ask</Text>}
+                </TouchableOpacity>
+              </View>
+            )}
+          </View>
 
           <View style={{ height: 48 }} />
         </Animated.ScrollView>
@@ -856,8 +1310,15 @@ export default function PlannerScreen({ navigation }) {
                   if (!saveNameInput.trim() || !saveModalRoute || saving) return;
                   setSaving(true);
                   try {
-                    await saveRoute(saveModalRoute, saveNameInput.trim());
+                    const namedRoute = { ...saveModalRoute, name: saveNameInput.trim() };
+                    await saveRoute(namedRoute, saveNameInput.trim());
                     setSavedRouteNames(prev => new Set(prev).add(saveModalRoute.name));
+                    if (saveModalRoute.isDrawn) {
+                      setPlan(prev => ({ ...prev, routes: [...(prev.routes || []), namedRoute] }));
+                      setSelectedRouteIdx((plan.routes?.length) || 0);
+                      setDrawnPoints([]);
+                      setDrawMode(false);
+                    }
                     setSaveModalRoute(null);
                     Alert.alert('Saved', `"${saveNameInput.trim()}" added to your routes.`);
                   } catch { Alert.alert('Error', 'Could not save \u2014 please try again.'); }
@@ -875,8 +1336,15 @@ export default function PlannerScreen({ navigation }) {
                   onPress={async () => {
                     setSaving(true);
                     try {
-                      await saveRoute(saveModalRoute, saveNameInput.trim());
+                      const namedRoute = { ...saveModalRoute, name: saveNameInput.trim() };
+                      await saveRoute(namedRoute, saveNameInput.trim());
                       setSavedRouteNames(prev => new Set(prev).add(saveModalRoute.name));
+                      if (saveModalRoute.isDrawn) {
+                        setPlan(prev => ({ ...prev, routes: [...(prev.routes || []), namedRoute] }));
+                        setSelectedRouteIdx((plan.routes?.length) || 0);
+                        setDrawnPoints([]);
+                        setDrawMode(false);
+                      }
                       setSaveModalRoute(null);
                       Alert.alert('Saved', `"${saveNameInput.trim()}" added to your routes.`);
                     } catch { Alert.alert('Error', 'Could not save \u2014 please try again.'); }
@@ -915,7 +1383,29 @@ const s = StyleSheet.create({
   nav:        { flexDirection: 'row', alignItems: 'center', paddingHorizontal: P, paddingBottom: 8, paddingTop: 4, borderBottomWidth: 0.5, borderBottomColor: colors.border },
   back:       { width: 36, height: 36, alignItems: 'center', justifyContent: 'center' },
   backText:   { fontSize: 22, color: colors.primary },
-  navTitle:   { flex: 1, fontSize: 15, fontWeight: '600', color: colors.text, marginLeft: 4 },
+  navTitle:      { flex: 1, fontSize: 15, fontWeight: '600', color: colors.text, marginLeft: 4 },
+  navTitleBtn:   { flex: 1, flexDirection: 'row', alignItems: 'center', gap: 5, marginLeft: 4 },
+  navTitlePencil:{ fontSize: 13, color: colors.textMuted },
+  navTitleInput: { flex: 1, fontSize: 15, fontWeight: '600', color: colors.text, marginLeft: 4, paddingVertical: 2, paddingHorizontal: 4, borderBottomWidth: 1.5, borderBottomColor: colors.primary },
+  // Ask AI
+  askCard:       { marginHorizontal: P, marginBottom: 8, backgroundColor: colors.white, borderRadius: 10, borderWidth: 1, borderColor: colors.border, padding: 12, shadowColor: '#000', shadowOffset: { width: 0, height: 1 }, shadowOpacity: 0.06, shadowRadius: 3, elevation: 1 },
+  askRow:        { flexDirection: 'row', gap: 8, alignItems: 'center' },
+  askInput:      { flex: 1, fontSize: 12, fontWeight: '400', color: colors.text, paddingVertical: 8, paddingHorizontal: 10, backgroundColor: colors.bgDeep, borderRadius: 8, borderWidth: 1, borderColor: colors.borderLight, minHeight: 36 },
+  askBtn:        { paddingHorizontal: 14, paddingVertical: 8, backgroundColor: colors.primary, borderRadius: 8, alignItems: 'center', justifyContent: 'center', minWidth: 44 },
+  askBtnDisabled:{ backgroundColor: colors.textFaint },
+  askBtnText:    { fontSize: 12, fontWeight: '500', color: '#fff' },
+  askBubble:     { backgroundColor: colors.primaryLight, borderRadius: 8, padding: 10 },
+  askBubbleText: { fontSize: 12, fontWeight: '400', color: colors.text, lineHeight: 18 },
+  askClear:      { marginTop: 8, alignSelf: 'flex-start' },
+  askClearText:  { fontSize: 11, fontWeight: '400', color: colors.primary },
+
+  routeCardWrap:         { position: 'relative' },
+  routeDeleteBtn:        { position: 'absolute', top: 10, right: 10, width: 24, height: 24, alignItems: 'center', justifyContent: 'center', zIndex: 1 },
+  routeDeleteBtnText:    { fontSize: 12, color: colors.textMuted },
+  saveSearchBtn:         { width: 32, height: 32, borderRadius: 8, borderWidth: 1, borderColor: colors.border, backgroundColor: colors.white, marginRight: 6, alignItems: 'center', justifyContent: 'center' },
+  saveSearchBtnSaved:    { borderColor: colors.primary, backgroundColor: colors.primaryLight },
+  saveSearchIcon:        { fontSize: 16, fontWeight: '400', color: colors.textMid, lineHeight: 18 },
+  saveSearchIconSaved:   { color: colors.primary, fontWeight: '600', fontSize: 13 },
   countBadge: { width: 22, height: 22, borderRadius: 11, backgroundColor: colors.primary, alignItems: 'center', justifyContent: 'center' },
   countText:  { fontSize: 10, fontWeight: '600', color: '#fff' },
   scroll:     { flex: 1 },
@@ -995,7 +1485,7 @@ const s = StyleSheet.create({
   generateBtnDisabled: { backgroundColor: '#c8c4bc', shadowOpacity: 0 },
   generateBtnText:     { fontSize: 14, fontWeight: '500', color: '#fff' },
 
-  logoBadge:  { width: 52, height: 52, borderRadius: 26, backgroundColor: colors.white, borderWidth: 1, borderColor: colors.border, alignItems: 'center', justifyContent: 'center', marginBottom: 10 },
+  logoBadge:  { width: 72, height: 72, borderRadius: 16, marginBottom: 14 },
   logoEmoji:  { fontSize: 24 },
   loadTitle:  { fontSize: 14, fontWeight: '400', color: colors.textMid },
   loadPrompt: { fontSize: 11, fontWeight: '300', color: colors.textMuted, textAlign: 'center', maxWidth: 260, lineHeight: 18 },
@@ -1088,13 +1578,28 @@ const s = StyleSheet.create({
 
   // Route action buttons
   routeActions:       { flexDirection: 'row', gap: 8, marginHorizontal: P, marginBottom: 8 },
-  navigateBtn:        { marginHorizontal: P, marginBottom: 8, backgroundColor: colors.good, borderRadius: 8, paddingVertical: 11, alignItems: 'center' },
+  navigateBtn:        { marginHorizontal: P, marginBottom: 6, backgroundColor: colors.good, borderRadius: 8, paddingVertical: 11, alignItems: 'center' },
+  viewRouteBtn:       { marginHorizontal: P, marginBottom: 8, borderRadius: 8, paddingVertical: 10, alignItems: 'center', borderWidth: 1, borderColor: colors.primary },
+  viewRouteBtnText:   { fontSize: 13, fontWeight: '500', color: colors.primary },
   navigateBtnText:    { fontSize: 13, fontWeight: '600', color: '#fff', letterSpacing: 0.2 },
 
   homeBtn:     { paddingHorizontal: 8, paddingVertical: 4, alignItems: 'center', justifyContent: 'center' },
 
   refineBtn:         { marginHorizontal: P, marginBottom: P, paddingVertical: 10, alignItems: 'center', borderTopWidth: 0.5, borderTopColor: colors.borderLight },
   refineBtnText:     { fontSize: 12, fontWeight: '500', color: colors.primary },
+  // Refine search bar
+  refineSearchBar:        { marginHorizontal: P, marginBottom: 8, marginTop: 6, flexDirection: 'row', alignItems: 'center', backgroundColor: colors.white, borderRadius: 9, borderWidth: 1, borderColor: colors.border, paddingHorizontal: 12, paddingVertical: 9 },
+  refineSearchBarLabel:   { flex: 1, fontSize: 11, fontWeight: '400', color: colors.textMid },
+  refineSearchBarEdit:    { fontSize: 11, fontWeight: '600', color: colors.primary, marginLeft: 8 },
+  refineSearchBox:        { marginHorizontal: P, marginBottom: 8, marginTop: 6, backgroundColor: colors.white, borderRadius: 9, borderWidth: 1, borderColor: colors.primary, padding: 12 },
+  refineSearchInput:      { fontSize: 13, fontWeight: '400', color: colors.text, minHeight: 36, lineHeight: 20 },
+  refineSearchBtns:       { flexDirection: 'row', justifyContent: 'flex-end', gap: 8, marginTop: 10 },
+  refineSearchCancel:     { paddingHorizontal: 14, paddingVertical: 7 },
+  refineSearchCancelText: { fontSize: 13, fontWeight: '400', color: colors.textMuted },
+  refineSearchGo:         { backgroundColor: colors.primary, borderRadius: 7, paddingHorizontal: 16, paddingVertical: 7 },
+  refineSearchGoDisabled: { backgroundColor: colors.border },
+  refineSearchGoText:     { fontSize: 13, fontWeight: '600', color: '#fff' },
+
   refineLoading:     { margin: P, flexDirection: 'row', alignItems: 'center', gap: 10, paddingVertical: 14, justifyContent: 'center' },
   refineLoadingText: { fontSize: 13, fontWeight: '400', color: colors.primary },
   refineBox:         { margin: P, backgroundColor: colors.bgDeep, borderRadius: 10, padding: 10 },
@@ -1130,4 +1635,32 @@ const s = StyleSheet.create({
   modalSave:        { flex: 1, paddingVertical: 12, borderRadius: 10, backgroundColor: colors.primary, alignItems: 'center' },
   modalSaveDisabled:{ backgroundColor: '#c8c4bc' },
   modalSaveText:    { fontSize: 14, fontWeight: '600', color: '#fff' },
+
+  drawBar:             { flexDirection: 'row', alignItems: 'center', paddingHorizontal: 10, paddingVertical: 7, gap: 6, borderBottomWidth: 0.5, borderBottomColor: colors.border, backgroundColor: colors.white, zIndex: 10, elevation: 2 },
+  mapExpandBtn:        { position: 'absolute', bottom: 46, left: 12, width: 28, height: 28, borderRadius: 7, backgroundColor: 'rgba(255,255,255,0.93)', alignItems: 'center', justifyContent: 'center', borderWidth: 1, borderColor: 'rgba(0,0,0,0.1)' },
+  mapExpandBtnText:    { fontSize: 14, color: colors.primary, lineHeight: 16, marginTop: 1 },
+  drawStatsOverlay:    { position: 'absolute', top: 10, left: 0, right: 0, alignItems: 'center', pointerEvents: 'none' },
+  drawStatsText:       { backgroundColor: 'rgba(0,0,0,0.42)', color: '#fff', fontSize: 12, fontWeight: '600', paddingHorizontal: 14, paddingVertical: 5, borderRadius: 20, overflow: 'hidden', letterSpacing: 0.2 },
+  drawClearBtn:        { borderColor: colors.warn + 'aa', backgroundColor: colors.warnLight || '#fff5f0' },
+  drawClearBtnText:    { color: colors.warn },
+  drawCtaBar:          { borderBottomWidth: 0.5, borderBottomColor: colors.border, backgroundColor: colors.white, paddingHorizontal: P, paddingVertical: 8, zIndex: 10, elevation: 2 },
+  drawCta:             { flexDirection: 'row', alignItems: 'center', gap: 10, backgroundColor: colors.primaryLight, borderRadius: 10, borderWidth: 1, borderColor: colors.primary + '33', paddingHorizontal: 14, paddingVertical: 10 },
+  drawCtaIcon:         { fontSize: 16, color: colors.primary },
+  drawCtaTextWrap:     { flex: 1 },
+  drawCtaTitle:        { fontSize: 12, fontWeight: '600', color: colors.primary },
+  drawCtaSub:          { fontSize: 10, fontWeight: '400', color: colors.textMid, marginTop: 1, lineHeight: 14 },
+  drawCtaArrow:        { fontSize: 18, color: colors.primary, lineHeight: 20 },
+  drawToggle:          { paddingHorizontal: 10, paddingVertical: 5, borderRadius: 8, borderWidth: 1, borderColor: colors.primary },
+  drawToggleActive:    { paddingHorizontal: 10, paddingVertical: 5, borderRadius: 8, backgroundColor: colors.primary },
+  drawToggleText:      { fontSize: 11, fontWeight: '500', color: colors.primary },
+  drawToggleTextActive:{ color: '#fff' },
+  drawStat:            { alignItems: 'center', paddingHorizontal: 6 },
+  drawStatVal:         { fontSize: 12, fontWeight: '600', color: colors.text },
+  drawStatLabel:       { fontSize: 9, fontWeight: '400', color: colors.textMuted },
+  drawAction:          { paddingHorizontal: 8, paddingVertical: 5, borderRadius: 8, borderWidth: 1, borderColor: colors.border },
+  drawActionText:      { fontSize: 11, fontWeight: '400', color: colors.textMid },
+  drawClear:           { paddingHorizontal: 8, paddingVertical: 5, borderRadius: 8, borderWidth: 1, borderColor: colors.warn + '88' },
+  drawClearText:       { fontSize: 11, fontWeight: '400', color: colors.warn },
+  drawFinish:          { paddingHorizontal: 14, paddingVertical: 5, borderRadius: 8, backgroundColor: colors.primary },
+  drawFinishText:      { fontSize: 11, fontWeight: '600', color: '#fff' },
 });

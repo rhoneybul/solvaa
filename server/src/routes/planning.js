@@ -111,6 +111,13 @@ For each route, provide:
 
 Use the skill level context provided in the user prompt to ensure routes are appropriate.
 
+WAYPOINT RULES — READ CAREFULLY:
+- Every waypoint coordinate MUST be on open navigable water. Zero exceptions.
+- Never place a point on land, beach, rock, cliff, building, road, or any non-water surface.
+- Check each point: if a map showed this coordinate, would it be in the sea/river/lake? If not, move it.
+- First point = launch site on the water's edge. Last point = take-out on the water's edge.
+- Intermediate points: only at significant navigation turns, in the water, never on land.
+
 Always prioritize safety and realistic planning.`;
 
 async function callClaudeAPI(messages, systemPrompt) {
@@ -140,13 +147,65 @@ async function callClaudeAPI(messages, systemPrompt) {
   }
 
   const data = await response.json();
+  if (data.stop_reason === 'max_tokens') {
+    console.warn('Claude response truncated (max_tokens reached) — JSON may be incomplete');
+  }
   return data.content[0].text;
 }
 
-function parseRoutesResponse(text) {
-  // Parse the JSON response from Claude
+/** Attempt to repair common JSON defects: trailing commas, truncated brackets/strings. */
+function repairJson(s) {
+  // 1. Remove trailing commas before ] or }
+  s = s.replace(/,\s*([\]}])/g, '$1');
+
+  // 2. Close any unclosed strings / arrays / objects caused by truncation
+  const stack = [];
+  let inString = false;
+  let escape = false;
+  let i = 0;
+
+  for (; i < s.length; i++) {
+    const c = s[i];
+    if (escape)         { escape = false; continue; }
+    if (c === '\\' && inString) { escape = true; continue; }
+    if (c === '"')      { inString = !inString; continue; }
+    if (inString)       continue;
+    if (c === '{')      stack.push('}');
+    else if (c === '[') stack.push(']');
+    else if (c === '}' || c === ']') {
+      if (stack.length && stack[stack.length - 1] === c) stack.pop();
+    }
+  }
+
+  // If we're still inside a string, close it
+  if (inString) s += '"';
+
+  // Close any open containers in reverse order
+  while (stack.length) s += stack.pop();
+
+  return s;
+}
+
+function extractJson(text) {
+  const stripped = text.replace(/```json|```/g, '');
+  const start = stripped.indexOf('{');
+  const end   = stripped.lastIndexOf('}');
+  if (start === -1) throw new Error('No JSON object found in Claude response');
+
+  // Use last } if present, otherwise repair will close it
+  const candidate = end !== -1 ? stripped.slice(start, end + 1) : stripped.slice(start);
+
   try {
-    const parsed = JSON.parse(text);
+    return JSON.parse(candidate);
+  } catch {
+    // Try repairing truncated / malformed JSON
+    return JSON.parse(repairJson(candidate));
+  }
+}
+
+function parseRoutesResponse(text) {
+  try {
+    const parsed = extractJson(text);
     if (!parsed.routes || !Array.isArray(parsed.routes)) {
       throw new Error('Invalid response format: missing routes array');
     }
@@ -173,7 +232,7 @@ router.post('/', async (req, res) => {
         [{ role: 'user', content: userMessage }],
         systemPrompt,
       );
-      const plan = JSON.parse(responseText.replace(/```json|```/g, '').trim());
+      const plan = extractJson(responseText);
 
       // Upload a GPX file to Supabase storage for each route (best-effort, in parallel)
       if (Array.isArray(plan.routes)) {
@@ -208,6 +267,46 @@ router.post('/', async (req, res) => {
     res.json(result);
   } catch (error) {
     console.error('Planning error:', error);
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// POST /api/planning/ask — ask a safety/weather question about routes
+router.post('/ask', async (req, res) => {
+  try {
+    const { question, weather, routes } = req.body;
+
+    if (!CLAUDE_API_KEY) {
+      return res.status(500).json({ error: 'Claude API key not configured' });
+    }
+    if (!question) {
+      return res.status(400).json({ error: 'question is required' });
+    }
+
+    const systemPrompt = `You are a kayaking safety and weather assistant built into the Solvaa app.
+The user has planned a paddle and wants a quick answer about safety, weather, or conditions.
+Keep answers concise — 2-4 sentences maximum. Be direct and practical.
+If conditions look dangerous for the routes shown, say so clearly.
+If you don't have enough information to answer confidently, say so.`;
+
+    const routeSummary = Array.isArray(routes) && routes.length > 0
+      ? `\n\nRoutes being considered:\n${routes.map((r, i) => `${i+1}. ${r.name || 'Route'} — ${r.distanceKm || '?'} km, ${r.difficulty_rating || r.difficulty || '?'} difficulty, launch: ${r.launchPoint || 'unknown'}`).join('\n')}`
+      : '';
+
+    const weatherSummary = weather
+      ? `\n\nCurrent conditions:\n- Wind: ${weather.windSpeed ?? '?'} kt from ${weather.windDirLabel ?? weather.windDir ?? '?'}\n- Waves: ${weather.waveHeight ?? '?'} m\n- Temp: ${weather.temp ?? '?'}°C\n- Condition: ${weather.condition?.label ?? '?'}\n- Safety score: ${weather.safetyScore ?? '?'}/100`
+      : '';
+
+    const userMessage = `${question}${routeSummary}${weatherSummary}`;
+
+    const answer = await callClaudeAPI(
+      [{ role: 'user', content: userMessage }],
+      systemPrompt,
+    );
+
+    res.json({ answer });
+  } catch (error) {
+    console.error('Ask error:', error);
     res.status(500).json({ error: error.message });
   }
 });

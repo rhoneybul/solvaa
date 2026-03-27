@@ -113,17 +113,22 @@ Respond ONLY with a valid JSON object (no markdown, no backticks, no preamble) i
 }
 
 CRITICAL — MARITIME-FIRST WAYPOINTS:
-- "waypoints" MUST be a JSON array of [latitude, longitude] number pairs tracing the ACTUAL paddle route on REAL navigable water near the REQUESTED destination.
-- NEVER use or anchor to example coordinates. Use your geographic knowledge to place each point accurately on navigable water (river channel, estuary, coastline, harbour, lake, bay).
-- The first point must be at a REAL launch point (boat ramp, marina, beach, slipway). The last point must be at a REAL take-out.
-- Intermediate points must follow the water — NEVER cross dry land, roads, or non-navigable terrain.
-- MARITIME ROUTING RULES:
-  * Routes must "hug" the coastline or follow the river/lake shore rather than cutting across open water or land.
-  * For coastal routes, keep waypoints within 500m–3km of the shoreline (depending on skill level).
-  * NEVER route through deep-sea shipping lanes unless the route is an advanced open-water crossing.
-  * Avoid restricted maritime zones, port exclusion areas, and military waters.
-  * If crossing between land masses (e.g. island hopping), choose the shortest safe water crossing and mark the crossing segment clearly.
-- Include 8–15 evenly spaced points. ALL points MUST sit on water. More points are better for complex coastlines.
+- "waypoints" MUST be a JSON array of [latitude, longitude] number pairs. Use your geographic knowledge to place each point accurately.
+- NEVER use or anchor to example coordinates.
+- ALL points MUST be on navigable water (sea, river, lake, estuary). NEVER place any point on land, roads, buildings, or above the high-water mark.
+- The first point must be at a REAL launch location on the water's edge (boat ramp, beach, slipway, marina). The last point must be at a REAL take-out on the water's edge.
+- CRITICAL POINTS ONLY — do NOT include evenly spaced filler points:
+  * Include the launch point (first waypoint)
+  * Include any significant navigation turning points — where the route changes direction by more than ~40°, e.g. rounding a headland, entering a bay, crossing a channel, reaching a turnaround point
+  * Include the take-out or end point (last waypoint)
+  * For loops or circumnavigations, include the key corner/apex points around the island or headland
+  * Total: 4–8 points only. Each point must represent a meaningful navigation decision, not just fill space.
+- WATER-ONLY RULES:
+  * Every coordinate must be verifiably on open water when checked on a map — not on the beach, not inland
+  * For coastal routes, points must be in the water, not on the shoreline itself
+  * For rivers/estuaries, points must be in the navigable channel
+  * When rounding headlands, the waypoint goes around the headland in the water, never over land
+  * Island circumnavigation: place points at the corners of the island on the water side only
 - The "Starting location coordinates" in the user message are your anchor — waypoints must be geographically near those coordinates, on the correct body of water.
 - For each route, set "launchPoint" to the specific name of the put-in location (e.g. "Seaton Beach Slipway", "Chichester Marina") so users can navigate to it by car.
 
@@ -405,6 +410,28 @@ export async function planPaddleWithWeather({
   plan._weather = weather;
 
   return plan;
+}
+
+/**
+ * Ask a safety/weather question about the current routes and conditions.
+ * @param {Object} opts
+ * @param {string}  opts.question  — free-text question from the user
+ * @param {Object}  [opts.weather] — current weather object (current conditions)
+ * @param {Array}   [opts.routes]  — array of route objects in the plan
+ * @returns {Promise<string>} — concise answer text
+ */
+export async function askSafety({ question, weather, routes } = {}) {
+  const response = await fetchWithTimeout(`${BASE_URL}/api/planning/ask`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ question, weather: weather?.current || null, routes }),
+  }, 30_000);
+  if (!response.ok) {
+    const err = await response.json().catch(() => ({}));
+    throw new Error(err?.error || `Ask API error ${response.status}`);
+  }
+  const { answer } = await response.json();
+  return answer;
 }
 
 /**

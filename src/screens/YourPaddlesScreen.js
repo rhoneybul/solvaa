@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback } from 'react';
 import {
-  View, Text, TouchableOpacity, StyleSheet, FlatList, ActivityIndicator,
+  View, Text, TouchableOpacity, StyleSheet, FlatList, ActivityIndicator, Image,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { colors } from '../theme';
@@ -170,7 +170,8 @@ export default function YourPaddlesScreen({ navigation }) {
 
         {loading ? (
           <View style={s.centered}>
-            <ActivityIndicator color={colors.primary} />
+            <Image source={require('../../assets/icons/ios/AppIcon-1024.png')} style={s.loadingIcon} />
+            <ActivityIndicator color={colors.primary} style={{ marginTop: 16 }} />
             <Text style={s.loadingText}>Loading activities…</Text>
           </View>
         ) : activities.length === 0 ? (
@@ -259,6 +260,7 @@ const s = StyleSheet.create({
   navTitle: { flex: 1, fontSize: 15, fontWeight: '600', color: colors.text, marginLeft: 4 },
   navSub:   { fontSize: 11, fontWeight: '400', color: colors.textMuted },
 
+  loadingIcon: { width: 72, height: 72, borderRadius: 16 },
   loadingText: { fontSize: 12, fontWeight: '300', color: colors.textMuted, marginTop: 12 },
   emptyTitle:  { fontSize: 16, fontWeight: '600', color: colors.text, marginBottom: 8 },
   emptySub:    { fontSize: 13, fontWeight: '300', color: colors.textMuted, textAlign: 'center', lineHeight: 20 },

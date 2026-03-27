@@ -1,5 +1,5 @@
-import { useMemo } from 'react';
-import { View, Text, StyleSheet } from 'react-native';
+import { useMemo, useRef } from 'react';
+import { View, Text, TouchableOpacity, StyleSheet } from 'react-native';
 import MapView, { Polyline, Marker, Callout } from 'react-native-maps';
 import { colors } from '../theme';
 
@@ -51,6 +51,41 @@ function fitRegion(coordSets) {
   };
 }
 
+function haversineKmNative(a, b) {
+  const R = 6371;
+  const dLat = (b.lat - a.lat) * Math.PI / 180;
+  const dLon = (b.lon - a.lon) * Math.PI / 180;
+  const s = Math.sin(dLat / 2) ** 2
+    + Math.cos(a.lat * Math.PI / 180) * Math.cos(b.lat * Math.PI / 180)
+    * Math.sin(dLon / 2) ** 2;
+  return R * 2 * Math.atan2(Math.sqrt(s), Math.sqrt(1 - s));
+}
+
+function extractCriticalPointsNative(pts, minBearingChange = 35, maxPts = 8) {
+  if (pts.length === 0) return [];
+  if (pts.length <= 2) return pts;
+  function brng(a, b) {
+    const dLon = (b.longitude - a.longitude) * Math.PI / 180;
+    const lat1 = a.latitude * Math.PI / 180, lat2 = b.latitude * Math.PI / 180;
+    const y = Math.sin(dLon) * Math.cos(lat2);
+    const x = Math.cos(lat1) * Math.sin(lat2) - Math.sin(lat1) * Math.cos(lat2) * Math.cos(dLon);
+    return ((Math.atan2(y, x) * 180 / Math.PI) + 360) % 360;
+  }
+  function bDiff(a, b) { const d = Math.abs(a - b) % 360; return d > 180 ? 360 - d : d; }
+  const result = [pts[0]];
+  let prevB = brng(pts[0], pts[1]);
+  for (let i = 1; i < pts.length - 1; i++) {
+    const nextB = brng(pts[i], pts[i + 1]);
+    if (bDiff(prevB, nextB) >= minBearingChange) { result.push(pts[i]); prevB = nextB; }
+  }
+  result.push(pts[pts.length - 1]);
+  if (result.length > maxPts) {
+    return Array.from({ length: maxPts }, (_, i) =>
+      result[Math.round((i / (maxPts - 1)) * (result.length - 1))]);
+  }
+  return result;
+}
+
 const ROUTE_COLORS = [colors.primary, colors.caution, colors.textMid];
 
 // Greyscale / muted Google Maps style (Android)
@@ -79,7 +114,13 @@ export default function PaddleMap({
   selectedIdx = 0,
   overlayTitle,
   overlayMeta,
+  drawMode = false,
+  drawnPoints = [],
+  onAddPoint,
+  onMovePoint,
+  simpleRoute = false,
 }) {
+  const mapRef = useRef(null);
   const parsed = useMemo(
     () => routes.map((r, i) => ({
       points: parseGpx(r.waypoints || ''),
@@ -89,10 +130,12 @@ export default function PaddleMap({
     [routes],
   );
 
-  // Only consider the selected route for map fit; fall back to all routes
+  // Overview mode (selectedIdx = -1): fit all routes; otherwise fit selected
   const fitPoints = useMemo(() => {
-    const sel = parsed[selectedIdx];
-    if (sel && sel.points.length > 0) return [sel.points];
+    if (selectedIdx >= 0) {
+      const sel = parsed[selectedIdx];
+      if (sel && sel.points.length > 0) return [sel.points];
+    }
     return parsed.filter(r => r.points.length > 0).map(r => r.points);
   }, [parsed, selectedIdx]);
 
@@ -119,13 +162,27 @@ export default function PaddleMap({
 
   const midPoint = selRaw.length >= 2 ? selRaw[Math.floor(selRaw.length / 2)] : null;
 
+  const fitToRoute = () => {
+    const pts = fitPoints.flat();
+    if (pts.length > 0 && mapRef.current) {
+      mapRef.current.fitToCoordinates(pts, {
+        edgePadding: { top: 40, right: 40, bottom: 40, left: 40 },
+        animated: true,
+      });
+    }
+  };
+
   return (
     <View style={[styles.container, { height }]}>
       <MapView
+        ref={mapRef}
         key={selectedIdx}
         style={StyleSheet.absoluteFill}
         initialRegion={region ?? undefined}
         customMapStyle={GREY_MAP_STYLE}
+        onPress={drawMode && onAddPoint
+          ? e => onAddPoint({ lat: e.nativeEvent.coordinate.latitude, lon: e.nativeEvent.coordinate.longitude })
+          : undefined}
         showsUserLocation
         showsMyLocationButton={false}
         showsCompass={false}
@@ -150,64 +207,68 @@ export default function PaddleMap({
           </Marker>
         )}
 
-        {/* Unselected routes — thin dashed */}
-        {parsed.map(r => r.idx !== selectedIdx && r.points.length > 0 ? (
-          <Polyline
-            key={r.idx}
-            coordinates={r.points}
-            strokeColor={r.color + '55'}
-            strokeWidth={1.5}
-            lineDashPattern={[6, 6]}
-          />
-        ) : null)}
+        {/* Unselected routes — full overview or ghosted start→end */}
+        {parsed.map(r => {
+          if (r.idx === selectedIdx || r.points.length < 2) return null;
+          const isOverview = selectedIdx === -1;
+          if (isOverview) {
+            return (
+              <Polyline
+                key={r.idx}
+                coordinates={r.points}
+                strokeColor={r.color + '99'}
+                strokeWidth={2}
+                lineDashPattern={[6, 3]}
+              />
+            );
+          }
+          return (
+            <Polyline
+              key={r.idx}
+              coordinates={[r.points[0], r.points[r.points.length - 1]]}
+              strokeColor={r.color + '55'}
+              strokeWidth={1.5}
+              lineDashPattern={[4, 4]}
+            />
+          );
+        })}
 
-        {/* Selected route — thick solid, drawn on top */}
-        {selectedRoute && selectedRoute.points.length > 0 && (
-          <Polyline
-            key={`sel_${selectedIdx}`}
-            coordinates={selectedRoute.points}
-            strokeColor={selectedRoute.color}
-            strokeWidth={4}
-          />
-        )}
+        {/* Selected route — key waypoint markers (skipped for drawn/simple routes) */}
+        {(() => {
+          const route = routes[selectedIdx];
+          if (route?.isDrawn || simpleRoute) return null;
+          const pts  = (parsed[selectedIdx]?.points) || [];
+          const kps  = extractCriticalPointsNative(pts);
+          const col  = parsed[selectedIdx]?.color || colors.primary;
+          return kps.map((kp, i) => (
+            <Marker key={`kp${i}`} coordinate={kp} anchor={{ x: 0.5, y: 0.5 }}>
+              <View style={[
+                styles.kpDot,
+                { backgroundColor: i === 0 ? col : i === kps.length - 1 ? colors.warn : col },
+                (i === 0 || i === kps.length - 1) && styles.kpDotLarge,
+              ]} />
+            </Marker>
+          ));
+        })()}
 
-        {/* Start marker */}
-        {selectedRoute?.points?.length > 0 && (
-          <Marker coordinate={selectedRoute.points[0]} anchor={{ x: 0.5, y: 1.2 }}>
-            <View style={styles.markerWrap}>
-              <View style={styles.markerLabel}>
-                <Text style={[styles.markerLabelText, { color: selectedRoute.color }]}>Launch</Text>
-              </View>
-              <View style={styles.markerStart} />
-            </View>
-          </Marker>
-        )}
-
-        {/* End marker — only shown for non-out-and-back routes */}
-        {selectedRoute?.points?.length > 0 && !isOutAndBack && (
+        {/* Drawn route points — draggable in draw mode */}
+        {drawnPoints.map((pt, i) => (
           <Marker
-            coordinate={selectedRoute.points[selectedRoute.points.length - 1]}
-            anchor={{ x: 0.5, y: 1.2 }}
+            key={`dp${i}`}
+            coordinate={{ latitude: pt.lat, longitude: pt.lon }}
+            anchor={{ x: 0.5, y: 0.5 }}
+            draggable={drawMode && !!onMovePoint}
+            onDragEnd={onMovePoint ? e => onMovePoint(i, { lat: e.nativeEvent.coordinate.latitude, lon: e.nativeEvent.coordinate.longitude }) : undefined}
           >
-            <View style={styles.markerWrap}>
-              <View style={styles.markerLabel}>
-                <Text style={[styles.markerLabelText, { color: colors.warn }]}>Take-out</Text>
-              </View>
-              <View style={styles.markerEnd} />
-            </View>
+            <View style={[styles.kpDot, i === 0 ? styles.kpDotStart : styles.kpDotDrawn]} />
           </Marker>
-        )}
-
-        {/* Turnaround marker for out-and-back routes */}
-        {isOutAndBack && midPoint && (
-          <Marker coordinate={midPoint} anchor={{ x: 0.5, y: 1.2 }}>
-            <View style={styles.markerWrap}>
-              <View style={styles.markerLabel}>
-                <Text style={[styles.markerLabelText, { color: colors.textMid }]}>Turn point</Text>
-              </View>
-              <View style={styles.markerMid} />
-            </View>
-          </Marker>
+        ))}
+        {drawnPoints.length >= 2 && (
+          <Polyline
+            coordinates={drawnPoints.map(p => ({ latitude: p.lat, longitude: p.lon }))}
+            strokeColor="#1d4ed8"
+            strokeWidth={2.5}
+          />
         )}
       </MapView>
 
@@ -217,6 +278,11 @@ export default function PaddleMap({
           {overlayMeta  ? <Text style={styles.overlayMeta}  numberOfLines={1}>{overlayMeta}</Text>  : null}
         </View>
       )}
+
+      {/* Center / fit button */}
+      <TouchableOpacity style={styles.centerBtn} onPress={fitToRoute} activeOpacity={0.75}>
+        <Text style={styles.centerBtnText}>⊙</Text>
+      </TouchableOpacity>
     </View>
   );
 }
@@ -236,4 +302,10 @@ const styles = StyleSheet.create({
   markerStart:  { width: 10, height: 10, borderRadius: 5, backgroundColor: colors.primary, borderWidth: 2, borderColor: '#fff' },
   markerEnd:    { width: 10, height: 10, borderRadius: 5, backgroundColor: colors.warn, borderWidth: 2, borderColor: '#fff' },
   markerMid:    { width: 10, height: 10, borderRadius: 5, backgroundColor: '#fff', borderWidth: 2, borderColor: colors.textMid },
+  kpDot:      { width: 8, height: 8, borderRadius: 4, backgroundColor: colors.primary, borderWidth: 2, borderColor: '#fff' },
+  kpDotLarge: { width: 12, height: 12, borderRadius: 6 },
+  kpDotStart: { width: 12, height: 12, borderRadius: 6, backgroundColor: '#1d4ed8', borderWidth: 2, borderColor: '#fff' },
+  kpDotDrawn: { width: 8, height: 8, borderRadius: 4, backgroundColor: '#fff', borderWidth: 2, borderColor: '#1d4ed8' },
+  centerBtn:  { position: 'absolute', bottom: 12, right: 12, width: 32, height: 32, borderRadius: 8, backgroundColor: 'rgba(255,255,255,0.93)', alignItems: 'center', justifyContent: 'center', borderWidth: 1, borderColor: 'rgba(0,0,0,0.12)' },
+  centerBtnText: { fontSize: 16, color: colors.primary, lineHeight: 18 },
 });

@@ -4,7 +4,7 @@ import {
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { colors } from '../theme';
-import { getSavedRoutes, deleteSavedRoute, saveRoute } from '../services/storageService';
+import { getSavedRoutes, deleteSavedRoute, saveRoute, updateRouteWaypoints } from '../services/storageService';
 import { getWeatherWithCache } from '../services/weatherService';
 import { refineRoute } from '../services/claudeService';
 import PaddleMap from '../components/PaddleMap';
@@ -46,10 +46,13 @@ const DATE_STRIP = (() => {
 
 // ── Component ─────────────────────────────────────────────────────────────────
 
-export default function SavedRoutesScreen({ navigation }) {
+export default function SavedRoutesScreen({ navigation, route: navRoute }) {
+  const previewRoute = navRoute?.params?.previewRoute ?? null;
+
   const [routes, setRoutes]               = useState([]);
   const [loading, setLoading]             = useState(true);
   const [selected, setSelected]           = useState(null);
+  const [isUnsaved, setIsUnsaved]         = useState(false); // true when selected came from previewRoute and isn't saved yet
   const [viewDate, setViewDate]           = useState(getTodayString());
   const [weather, setWeather]             = useState(null);
   const [weatherLoading, setWeatherLoading] = useState(false);
@@ -59,10 +62,27 @@ export default function SavedRoutesScreen({ navigation }) {
   const [showEdit, setShowEdit]           = useState(false);
   const [editingName, setEditingName]     = useState(false);
   const [nameInput, setNameInput]         = useState('');
+  const [drawMode, setDrawMode]           = useState(false);
+  const [drawnPoints, setDrawnPoints]     = useState([]);
+  const [saving, setSaving]               = useState(false);
 
   const load = useCallback(async () => {
     setLoading(true);
-    try { setRoutes(await getSavedRoutes()); }
+    try {
+      const saved = await getSavedRoutes();
+      setRoutes(saved);
+      // If navigated with a previewRoute, find the saved version or show as unsaved
+      if (previewRoute) {
+        const match = saved.find(r => r.name === previewRoute.name);
+        if (match) {
+          setSelected(match);
+          setIsUnsaved(false);
+        } else {
+          setSelected({ ...previewRoute, id: `preview-${Date.now()}` });
+          setIsUnsaved(true);
+        }
+      }
+    }
     finally { setLoading(false); }
   }, []);
 
@@ -107,6 +127,36 @@ export default function SavedRoutesScreen({ navigation }) {
     }
   };
 
+  const drawnDistKm = drawnPoints.length >= 2
+    ? drawnPoints.reduce((acc, pt, i) => {
+        if (i === 0) return 0;
+        const a = drawnPoints[i - 1], b = pt;
+        const R = 6371;
+        const dLat = (b.lat - a.lat) * Math.PI / 180;
+        const dLon = (b.lon - a.lon) * Math.PI / 180;
+        const s = Math.sin(dLat/2)**2 + Math.cos(a.lat*Math.PI/180)*Math.cos(b.lat*Math.PI/180)*Math.sin(dLon/2)**2;
+        return acc + R * 2 * Math.atan2(Math.sqrt(s), Math.sqrt(1-s));
+      }, 0)
+    : 0;
+  const drawnTimeHrs = drawnDistKm / 4;
+
+  const handleFinishDraw = async () => {
+    if (drawnPoints.length < 2) return;
+    try {
+      const waypoints = drawnPoints.map(p => [p.lat, p.lon]);
+      const distanceKm = parseFloat(drawnDistKm.toFixed(1));
+      const estimated_duration = parseFloat(drawnTimeHrs.toFixed(1));
+      await updateRouteWaypoints(selected.id, { waypoints, distanceKm, estimated_duration });
+      const fresh = await getSavedRoutes();
+      setRoutes(fresh);
+      setSelected(fresh.find(r => r.id === selected.id) || { ...selected, waypoints, distanceKm, estimated_duration });
+      setDrawnPoints([]);
+      setDrawMode(false);
+    } catch {
+      Alert.alert('Error', 'Could not save edited route — please try again.');
+    }
+  };
+
   const handleRename = async () => {
     const trimmed = nameInput.trim();
     if (!trimmed || trimmed === selected.name) { setEditingName(false); return; }
@@ -119,6 +169,23 @@ export default function SavedRoutesScreen({ navigation }) {
       setSelected(fresh.find(r => r.name === trimmed) || renamed);
     } catch { Alert.alert('Error', 'Could not rename — please try again.'); }
     setEditingName(false);
+  };
+
+  const handleSavePreview = async () => {
+    if (!selected || !isUnsaved) return;
+    setSaving(true);
+    try {
+      await saveRoute(selected, selected.name);
+      const fresh = await getSavedRoutes();
+      setRoutes(fresh);
+      const match = fresh.find(r => r.name === selected.name);
+      if (match) setSelected(match);
+      setIsUnsaved(false);
+    } catch {
+      Alert.alert('Error', 'Could not save route — please try again.');
+    } finally {
+      setSaving(false);
+    }
   };
 
   const handleRefine = async () => {
@@ -159,54 +226,109 @@ export default function SavedRoutesScreen({ navigation }) {
             <TouchableOpacity onPress={() => setSelected(null)} style={s.back}>
               <Text style={s.backText}>‹</Text>
             </TouchableOpacity>
-            <Text style={s.navTitle} numberOfLines={1}>{selected.name}</Text>
-            <TouchableOpacity onPress={() => handleDelete(selected.id)} style={s.deleteBtn}>
-              <TrashIcon size={22} color={colors.warn} />
-            </TouchableOpacity>
+            {editingName && !isUnsaved ? (
+              <TextInput
+                style={s.navTitleInput}
+                value={nameInput}
+                onChangeText={setNameInput}
+                autoFocus
+                returnKeyType="done"
+                onSubmitEditing={handleRename}
+                onBlur={handleRename}
+                selectTextOnFocus
+              />
+            ) : isUnsaved ? (
+              <Text style={[s.navTitle, { marginLeft: 4 }]} numberOfLines={1}>{selected.name}</Text>
+            ) : (
+              <TouchableOpacity
+                style={s.navTitleBtn}
+                onPress={() => { setNameInput(selected.name); setEditingName(true); }}
+                activeOpacity={0.7}
+              >
+                <Text style={s.navTitle} numberOfLines={1}>{selected.name}</Text>
+                <PencilIcon size={12} color={colors.textMuted} />
+              </TouchableOpacity>
+            )}
+            {!isUnsaved && (
+              <TouchableOpacity onPress={() => handleDelete(selected.id)} style={s.deleteBtn}>
+                <TrashIcon size={22} color={colors.warn} />
+              </TouchableOpacity>
+            )}
             <TouchableOpacity onPress={() => navigation.navigate('Home')} style={s.homeBtn}>
               <HomeIcon size={22} color={colors.primary} />
             </TouchableOpacity>
           </View>
 
-          {/* Map — pinned, with tappable name overlay */}
-          <View style={{ position: 'relative' }}>
-            <PaddleMap
-              height={220}
-              coords={selected.locationCoords
-                ? { lat: selected.locationCoords.lat, lon: selected.locationCoords.lng }
-                : undefined}
-              routes={[selected]}
-              selectedIdx={0}
-            />
-            {/* Tappable name pill over the map */}
+          <PaddleMap
+            height={220}
+            coords={selected.locationCoords
+              ? { lat: selected.locationCoords.lat, lon: selected.locationCoords.lng }
+              : undefined}
+            routes={[selected]}
+            selectedIdx={0}
+            drawMode={drawMode}
+            drawnPoints={drawnPoints}
+            onAddPoint={pt => setDrawnPoints(prev => [...prev, pt])}
+            onMovePoint={(idx, pt) => setDrawnPoints(prev => prev.map((p, i) => i === idx ? pt : p))}
+            windHourly={weather?.hourly || []}
+            simpleRoute
+          />
+
+          {/* Draw / edit controls */}
+          <View style={s.drawBar}>
             <TouchableOpacity
-              style={s.mapNamePill}
-              onPress={() => { setNameInput(selected.name); setEditingName(true); }}
+              style={[s.drawToggle, drawMode && s.drawToggleActive]}
+              onPress={() => {
+                if (!drawMode) {
+                  const pts = (selected.waypoints || [])
+                    .map(w => Array.isArray(w) ? { lat: w[0], lon: w[1] } : w)
+                    .filter(p => p?.lat != null && p?.lon != null);
+                  setDrawnPoints(pts);
+                } else {
+                  setDrawnPoints([]);
+                }
+                setDrawMode(d => !d);
+              }}
               activeOpacity={0.85}
             >
-              {editingName ? (
-                <TextInput
-                  style={s.mapNameInput}
-                  value={nameInput}
-                  onChangeText={setNameInput}
-                  autoFocus
-                  returnKeyType="done"
-                  onSubmitEditing={handleRename}
-                  onBlur={handleRename}
-                  selectTextOnFocus
-                />
-              ) : (
-                <>
-                  <View style={s.mapNameRow}>
-                    <Text style={s.mapNameText} numberOfLines={1}>{selected.name}</Text>
-                    <PencilIcon size={11} color={colors.textMuted} />
-                  </View>
-                  {(selected.launchPoint || selected.location) ? (
-                    <Text style={s.mapNameSub} numberOfLines={1}>{selected.launchPoint || selected.location}</Text>
-                  ) : null}
-                </>
-              )}
+              <Text style={[s.drawToggleText, drawMode && s.drawToggleTextActive]}>
+                {drawMode ? 'Drawing…' : 'Edit route'}
+              </Text>
             </TouchableOpacity>
+
+            {drawMode && (
+              <View style={{ flex: 1, flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+                {drawnPoints.length > 0 && (
+                  <>
+                    <View style={s.drawStat}>
+                      <Text style={s.drawStatVal}>{drawnDistKm.toFixed(1)} km</Text>
+                      <Text style={s.drawStatLabel}>distance</Text>
+                    </View>
+                    <View style={s.drawStat}>
+                      <Text style={s.drawStatVal}>
+                        {drawnTimeHrs < 1 ? `${Math.round(drawnTimeHrs * 60)} min` : `${drawnTimeHrs.toFixed(1)} h`}
+                      </Text>
+                      <Text style={s.drawStatLabel}>~time</Text>
+                    </View>
+                    <TouchableOpacity style={s.drawAction} onPress={() => setDrawnPoints(p => p.slice(0, -1))} activeOpacity={0.7}>
+                      <Text style={s.drawActionText}>Undo</Text>
+                    </TouchableOpacity>
+                    <TouchableOpacity style={s.drawAction} onPress={() => setDrawnPoints(p => [...p, p[0]])} activeOpacity={0.7}>
+                      <Text style={s.drawActionText}>Loop</Text>
+                    </TouchableOpacity>
+                  </>
+                )}
+                <TouchableOpacity style={s.drawClear} onPress={() => setDrawnPoints([])} activeOpacity={0.7}>
+                  <Text style={s.drawClearText}>Clear all</Text>
+                </TouchableOpacity>
+              </View>
+            )}
+
+            {drawMode && drawnPoints.length >= 2 && (
+              <TouchableOpacity style={s.drawFinish} onPress={handleFinishDraw} activeOpacity={0.85}>
+                <Text style={s.drawFinishText}>Finish</Text>
+              </TouchableOpacity>
+            )}
           </View>
 
           {/* Scrollable content */}
@@ -225,6 +347,21 @@ export default function SavedRoutesScreen({ navigation }) {
                 </View>
               ))}
             </View>
+
+            {/* Save route (only shown for unsaved previews) */}
+            {isUnsaved && (
+              <TouchableOpacity
+                style={s.goBtn}
+                onPress={handleSavePreview}
+                disabled={saving}
+                activeOpacity={0.85}
+              >
+                {saving
+                  ? <ActivityIndicator color="#fff" />
+                  : <Text style={s.goBtnText}>Save route</Text>
+                }
+              </TouchableOpacity>
+            )}
 
             {/* GPX download badge */}
             {selected.gpxUrl && (
@@ -268,6 +405,22 @@ export default function SavedRoutesScreen({ navigation }) {
                     <Text style={s.refineSubmitText}>Refine</Text>
                   </TouchableOpacity>
                 </View>
+              </View>
+            )}
+
+            {/* Description */}
+            {selected.description ? (
+              <View style={s.descCard}>
+                <Text style={s.descText}>{selected.description}</Text>
+              </View>
+            ) : null}
+
+            {/* Highlights */}
+            {selected.highlights?.length > 0 && (
+              <View style={s.chipsWrap}>
+                {selected.highlights.map((h, i) => (
+                  <View key={i} style={s.chip}><Text style={s.chipText}>{h}</Text></View>
+                ))}
               </View>
             )}
 
@@ -326,22 +479,6 @@ export default function SavedRoutesScreen({ navigation }) {
               />
             ) : null}
 
-            {/* Description */}
-            {selected.description ? (
-              <View style={s.descCard}>
-                <Text style={s.descText}>{selected.description}</Text>
-              </View>
-            ) : null}
-
-            {/* Highlights */}
-            {selected.highlights?.length > 0 && (
-              <View style={s.chipsWrap}>
-                {selected.highlights.map((h, i) => (
-                  <View key={i} style={s.chip}><Text style={s.chipText}>{h}</Text></View>
-                ))}
-              </View>
-            )}
-
             <View style={{ height: 32 }} />
           </ScrollView>
         </SafeAreaView>
@@ -398,15 +535,24 @@ export default function SavedRoutesScreen({ navigation }) {
                       : undefined}
                     routes={[r]}
                     selectedIdx={0}
+                    simpleRoute
                   />
-                  {/* Ticket 3: Heart icon */}
                   <View style={s.heartOverlay}>
                     <HeartIcon filled size={20} color={colors.warn} />
                   </View>
                 </View>
                 {/* Route info */}
                 <View style={s.routeInfo}>
-                  <Text style={s.routeName} numberOfLines={1}>{r.name}</Text>
+                  <View style={s.routeNameRow}>
+                    <Text style={s.routeName} numberOfLines={1}>{r.name}</Text>
+                    <TouchableOpacity
+                      style={s.listDeleteBtn}
+                      onPress={() => handleDelete(r.id)}
+                      hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+                    >
+                      <TrashIcon size={16} color={colors.warn} />
+                    </TouchableOpacity>
+                  </View>
                   <Text style={s.routeLocation} numberOfLines={1}>{r.location || r.launchPoint || '\u2014'}</Text>
                   <View style={s.routeMeta}>
                     {r.distanceKm  ? <View style={s.metaChip}><Text style={s.metaChipText}>{r.distanceKm} km</Text></View> : null}
@@ -437,11 +583,10 @@ const s = StyleSheet.create({
   back:          { width: 36, height: 36, alignItems: 'center', justifyContent: 'center' },
   backText:      { fontSize: 22, color: colors.primary },
   navTitle:      { flex: 1, fontSize: 15, fontWeight: '600', color: colors.text, marginLeft: 4 },
-  mapNamePill:   { position: 'absolute', bottom: 12, left: 12, backgroundColor: 'rgba(255,255,255,0.93)', borderRadius: 10, paddingHorizontal: 12, paddingVertical: 8, maxWidth: '72%' },
-  mapNameRow:    { flexDirection: 'row', alignItems: 'center', gap: 5 },
-  mapNameText:   { fontSize: 13, fontWeight: '600', color: colors.text, flexShrink: 1 },
-  mapNameSub:    { fontSize: 11, fontWeight: '400', color: colors.textMuted, marginTop: 2 },
-  mapNameInput:  { fontSize: 13, fontWeight: '600', color: colors.text, minWidth: 140, borderBottomWidth: 1, borderBottomColor: colors.border, paddingVertical: 0 },
+  navTitleBtn:   { flex: 1, flexDirection: 'row', alignItems: 'center', gap: 5, marginLeft: 4 },
+  navTitleInput: { flex: 1, fontSize: 15, fontWeight: '600', color: colors.text, marginLeft: 4, paddingVertical: 2, paddingHorizontal: 4, borderBottomWidth: 1.5, borderBottomColor: colors.primary },
+  goBtn:         { marginHorizontal: 14, marginBottom: 10, backgroundColor: colors.primary, borderRadius: 12, paddingVertical: 14, alignItems: 'center' },
+  goBtnText:     { fontSize: 15, fontWeight: '600', color: '#fff' },
   deleteBtn:     { paddingHorizontal: 8, alignItems: 'center', justifyContent: 'center' },
   homeBtn:       { paddingHorizontal: 8, paddingVertical: 4, alignItems: 'center', justifyContent: 'center' },
 
@@ -451,7 +596,9 @@ const s = StyleSheet.create({
   mapThumb:    { overflow: 'hidden', position: 'relative' },
   heartOverlay:{ position: 'absolute', top: 6, left: 6, backgroundColor: 'rgba(255,255,255,0.85)', borderRadius: 12, padding: 4 },
   routeInfo:   { padding: P },
-  routeName:   { fontSize: 14, fontWeight: '600', color: colors.text, marginBottom: 2 },
+  routeNameRow:  { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 2 },
+  routeName:     { fontSize: 14, fontWeight: '600', color: colors.text, flex: 1 },
+  listDeleteBtn: { padding: 4, marginLeft: 8 },
   routeLocation: { fontSize: 11, fontWeight: '400', color: colors.textMuted, marginBottom: 7 },
   routeMeta:   { flexDirection: 'row', flexWrap: 'wrap', gap: 5 },
   metaChip:    { backgroundColor: colors.bgDeep, borderRadius: 4, paddingHorizontal: 7, paddingVertical: 2 },
@@ -495,6 +642,21 @@ const s = StyleSheet.create({
   chipsWrap:   { flexDirection: 'row', flexWrap: 'wrap', gap: 6, marginHorizontal: P, marginBottom: 8 },
   chip:        { backgroundColor: colors.bgDeep, borderRadius: 4, paddingHorizontal: 8, paddingVertical: 3 },
   chipText:    { fontSize: 10, fontWeight: '400', color: colors.textMid },
+
+  drawBar:            { flexDirection: 'row', alignItems: 'center', paddingHorizontal: 10, paddingVertical: 7, gap: 6, borderBottomWidth: 0.5, borderBottomColor: colors.border, backgroundColor: colors.white },
+  drawToggle:         { paddingHorizontal: 10, paddingVertical: 5, borderRadius: 8, borderWidth: 1, borderColor: colors.primary },
+  drawToggleActive:   { backgroundColor: colors.primary },
+  drawToggleText:     { fontSize: 11, fontWeight: '500', color: colors.primary },
+  drawToggleTextActive:{ color: '#fff' },
+  drawStat:           { alignItems: 'center', paddingHorizontal: 4 },
+  drawStatVal:        { fontSize: 12, fontWeight: '600', color: colors.text },
+  drawStatLabel:      { fontSize: 9, fontWeight: '400', color: colors.textMuted },
+  drawAction:         { paddingHorizontal: 8, paddingVertical: 5, borderRadius: 8, borderWidth: 1, borderColor: colors.border },
+  drawActionText:     { fontSize: 11, fontWeight: '400', color: colors.textMid },
+  drawClear:          { paddingHorizontal: 8, paddingVertical: 5, borderRadius: 8, borderWidth: 1, borderColor: colors.warn + '88' },
+  drawClearText:      { fontSize: 11, fontWeight: '400', color: colors.warn },
+  drawFinish:         { paddingHorizontal: 14, paddingVertical: 5, borderRadius: 8, backgroundColor: colors.primary },
+  drawFinishText:     { fontSize: 11, fontWeight: '600', color: '#fff' },
 
   refineBtn:          { marginHorizontal: P, marginTop: 4, marginBottom: 8, borderWidth: 1, borderColor: colors.primary, borderRadius: 10, paddingVertical: 11, alignItems: 'center' },
   refineBtnText:      { fontSize: 13, fontWeight: '500', color: colors.primary },

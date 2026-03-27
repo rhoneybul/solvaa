@@ -11,6 +11,7 @@ import {
   handleStravaWebCallback, isStravaConfigured,
 } from '../services/stravaService';
 import StravaLogo from '../components/StravaLogo';
+import { SearchIcon } from '../components/Icons';
 
 export default function HomeScreen({ navigation }) {
   const [name, setName]                   = useState(null);
@@ -127,6 +128,23 @@ export default function HomeScreen({ navigation }) {
           <View style={s.actionTextWrap}>
             <Text style={s.actionLabel}>Saved Paddles</Text>
             <Text style={s.actionSub}>Your bookmarked routes</Text>
+          </View>
+          <Text style={s.actionChevron}>›</Text>
+        </TouchableOpacity>
+
+        <View style={s.actionDivider} />
+
+        <TouchableOpacity
+          style={s.actionRow}
+          onPress={() => navigation.navigate('SavedSearches')}
+          activeOpacity={0.75}
+        >
+          <View style={[s.actionIconWrap, s.actionIconSaved]}>
+            <SearchIcon size={16} color={colors.primary} />
+          </View>
+          <View style={s.actionTextWrap}>
+            <Text style={s.actionLabel}>Saved Searches</Text>
+            <Text style={s.actionSub}>Re-open previous route searches</Text>
           </View>
           <Text style={s.actionChevron}>›</Text>
         </TouchableOpacity>
