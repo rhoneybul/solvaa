@@ -3,12 +3,12 @@
     "name": "Solvaa",
     "slug": "kayak-planner",
     "scheme": "solvaa",
-    "version": "1.1.0",
+    "version": "1.2.0",
     "orientation": "portrait",
-    "icon": "./assets/icon.png",
+    "icon": "./assets/icons/ios/AppIcon-1024.png",
     "userInterfaceStyle": "light",
     "splash": {
-      "image": "./assets/splash-icon.png",
+      "image": "./assets/icons/ios/AppIcon-1024.png",
       "resizeMode": "contain",
       "backgroundColor": "#f2f1ed"
     },
@@ -23,7 +23,7 @@
     },
     "android": {
       "adaptiveIcon": {
-        "foregroundImage": "./assets/adaptive-icon.png",
+        "foregroundImage": "./assets/icons/android/playstore-icon.png",
         "backgroundColor": "#f2f1ed"
       },
       "package": "com.solvaa.app",
@@ -38,7 +38,7 @@
     "web": {
       "bundler": "metro",
       "output": "single",
-      "favicon": "./assets/favicon.png",
+      "favicon": "./assets/icons/web/favicon-32x32.png",
       "name": "Solvaa",
       "shortName": "Solvaa",
       "description": "Know the water before you go — AI-powered kayak trip planning",
@@ -53,9 +53,15 @@
           "locationAlwaysAndWhenInUsePermission": "Solvaa uses your location to track your route and provide real-time safety alerts."
         }
       ],
+      [
+        "@sentry/react-native/expo",
+        {
+          "organization": "solvaa",
+          "project": "solvaa"
+        }
+      ],
       "expo-web-browser",
-      "@react-native-community/datetimepicker",
-      "@sentry/react-native/expo"
+      "@react-native-community/datetimepicker"
     ],
     "extra": {
       "stravaClientId": "",
