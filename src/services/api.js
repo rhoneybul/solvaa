@@ -60,7 +60,8 @@ export const api = {
     list:   ()        => request('GET',  '/api/paddles'),
     stats:  ()        => request('GET',  '/api/paddles/stats'),
     get:    (id)      => request('GET',  `/api/paddles/${id}`),
-    create: (paddle)  => request('POST', '/api/paddles', paddle),
+    create: (paddle)  => request('POST',   '/api/paddles', paddle),
+    delete: (id)      => request('DELETE', `/api/paddles/${id}`),
   },
 
   // ── Saved routes ──────────────────────────────────────────────────────────

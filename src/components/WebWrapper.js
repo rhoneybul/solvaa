@@ -21,7 +21,7 @@ export default function WebWrapper({ children }) {
 const s = StyleSheet.create({
   outer: {
     flex: 1,
-    backgroundColor: '#c2bfb8',
+    backgroundColor: '#cdd1d8',
     alignItems: 'center',
     justifyContent: 'center',
     // On web this creates the desktop frame
@@ -33,7 +33,7 @@ const s = StyleSheet.create({
     height: '100vh',
     maxHeight: 844,
     overflow: 'hidden',
-    backgroundColor: '#f2f1ed',
+    backgroundColor: '#f0f2f5',
     // Subtle phone shadow on desktop
     boxShadow: '0 24px 80px rgba(0,0,0,0.4)',
     borderRadius: 8,

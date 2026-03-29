@@ -454,10 +454,8 @@ router.post('/photos', async (req, res) => {
     // Sample start, mid, end — or fall back to locationCoords
     const sampleCoords = [];
     if (wpts.length >= 2) {
-      const first = wpts[0];
-      const mid   = wpts[Math.floor(wpts.length / 2)];
-      const last  = wpts[wpts.length - 1];
-      for (const pt of [first, mid, last]) {
+      const pts = [wpts[0], wpts[Math.floor(wpts.length / 2)], wpts[wpts.length - 1]];
+      for (const pt of pts) {
         if (!sampleCoords.find(c => c.lat === pt.lat && c.lon === pt.lon)) {
           sampleCoords.push(pt);
         }
@@ -474,27 +472,28 @@ router.post('/photos', async (req, res) => {
     const coordList = sampleCoords
       .map((c, i) => {
         const label = i === 0 ? 'launch' : i === sampleCoords.length - 1 ? 'finish' : 'midpoint';
-        return `  - ${label}: ${c.lat.toFixed(5)}, ${c.lon.toFixed(5)}`;
+        return `  ${label}: ${c.lat.toFixed(5)}, ${c.lon.toFixed(5)}`;
       })
       .join('\n');
 
-    let articleTitles = [];
+    // Ask Claude: what are the kayaking highlights within ~100m of these exact coordinates?
+    // Use those highlight names as Wikimedia Commons search queries.
+    let searchQueries = [];
 
     if (CLAUDE_API_KEY) {
-      const systemPrompt = `You are a geography assistant. Given exact GPS coordinates along a kayak route, suggest exactly 3 Wikipedia article titles for places that lie directly on or immediately alongside those coordinates.
+      const systemPrompt = `You are a local paddling guide with expert geographic knowledge.
+Given GPS coordinates along a kayak route, identify exactly 3 specific kayaking highlights that a paddler would encounter within approximately 100 metres of those points.
 
-Rules:
-- Strongly prefer water-focused articles: bays, lochs, estuaries, sea channels, straits, headlands, islands, beaches, nature reserves on the water — anything whose Wikipedia lead photo shows open water, coastline, or the water body itself
-- Avoid articles whose lead photo is likely to be a town centre, building, road, or inland landscape with no water visible
-- Each article must correspond to somewhere the paddler would actually pass through or see from the water
-- Use the coordinates to identify the specific geography — do not suggest places far from the given points
-- Articles must exist on Wikipedia and be likely to have a lead photograph
-- Spread suggestions across the route (one near launch, one near midpoint, one near finish) where possible
+A highlight must be a named, visible feature right on the water: a sea arch, sea stack, cave, tidal race, waterfall into the sea, headland, narrow channel, island, reef, rock formation, beach, cove, or similar.
+Do NOT suggest towns, car parks, pubs, or anything inland.
+Each highlight must be real and verifiable — use your geographic knowledge of the area.
 
-Respond ONLY with a valid JSON array of 3 strings — article titles exactly as they appear on Wikipedia. No preamble, no markdown.
-Example: ["Sound of Mull", "Lismore, Argyll", "Lynn of Lorn"]`;
+For each highlight, provide a short Wikimedia Commons search query (2–5 words) that will find a photograph of that exact feature.
 
-      const userMessage = `Route name: ${route.name || 'Unnamed'}\nTerrain: ${route.terrain || 'coastal'}\nWaypoint coordinates:\n${coordList || '  (none provided)'}`;
+Respond ONLY with a valid JSON array of 3 strings — each string is the search query. No preamble, no markdown.
+Example for Pembrokeshire: ["Green Bridge of Wales", "Elegug Stacks Pembrokeshire", "St Govan's Head sea"]`;
+
+      const userMessage = `Route: ${route.name || 'Unnamed'} (${route.terrain || 'coastal'})\nWaypoint coordinates:\n${coordList || '  (none)'}`;
 
       try {
         const answer = await callClaudeAPI(
@@ -502,39 +501,58 @@ Example: ["Sound of Mull", "Lismore, Argyll", "Lynn of Lorn"]`;
           systemPrompt,
         );
         const parsed = JSON.parse(answer.replace(/```json?|```/g, '').trim());
-        if (Array.isArray(parsed)) articleTitles = parsed.slice(0, 3);
+        if (Array.isArray(parsed)) searchQueries = parsed.slice(0, 3);
       } catch (e) {
         console.warn('[photos] Claude parse failed:', e.message);
       }
     }
 
-    // Fallback: use route name + location as search terms
-    if (articleTitles.length === 0) {
-      articleTitles = [route.name, route.launchPoint, route.terrain].filter(Boolean).slice(0, 3);
+    // Fallback search queries
+    if (searchQueries.length === 0) {
+      const base = route.launchPoint || route.name || 'coast';
+      searchQueries = [`${base} kayak`, `${base} sea arch`, `${base} coastline`];
     }
 
-    // Fetch Wikipedia thumbnails for each article title
-    const WIKI = 'https://en.wikipedia.org/w/api.php';
+    // Search Wikimedia Commons for each query and take the best JPEG result
+    const COMMONS = 'https://commons.wikimedia.org/w/api.php';
     const photos = [];
+
     await Promise.all(
-      articleTitles.map(async (title) => {
+      searchQueries.map(async (query) => {
         try {
           const params = new URLSearchParams({
-            action: 'query',
-            titles: title,
-            prop: 'pageimages',
-            piprop: 'thumbnail',
-            pithumbsize: '600',
-            format: 'json',
-            origin: '*',
+            action:     'query',
+            generator:  'search',
+            gsrsearch:  `filetype:bitmap ${query}`,
+            gsrnamespace: '6',  // File: namespace
+            gsrlimit:   '8',
+            prop:       'imageinfo',
+            iiprop:     'url|dimensions|mime|extmetadata|canonicalurl',
+            iiurlwidth: '800',
+            format:     'json',
+            origin:     '*',
           });
-          const r = await fetch(`${WIKI}?${params}`);
+          const r = await fetch(`${COMMONS}?${params}`);
           if (!r.ok) return;
           const data = await r.json();
-          const pages = data?.query?.pages || {};
-          const page = Object.values(pages)[0];
-          if (page?.thumbnail?.source) {
-            photos.push({ url: page.thumbnail.source, title: page.title.replace(/_/g, ' ') });
+          const pages = Object.values(data?.query?.pages || {});
+
+          // Pick the first landscape-oriented JPEG that's large enough
+          const pick = pages.find(p => {
+            const ii = p.imageinfo?.[0];
+            if (!ii) return false;
+            if (!ii.mime?.startsWith('image/jpeg')) return false;
+            if ((ii.width || 0) < 600 || (ii.height || 0) < 300) return false;
+            // Prefer landscape orientation
+            return (ii.width || 0) >= (ii.height || 0);
+          });
+
+          if (pick) {
+            const ii = pick.imageinfo[0];
+            const url = ii.thumburl || ii.url;
+            const caption = pick.title.replace(/^File:/, '').replace(/\.[^.]+$/, '').replace(/_/g, ' ');
+            const commonsUrl = ii.canonicalurl || `https://commons.wikimedia.org/wiki/${encodeURIComponent(pick.title)}`;
+            photos.push({ url, title: caption, commonsUrl });
           }
         } catch { /* skip */ }
       })

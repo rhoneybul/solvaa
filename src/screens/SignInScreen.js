@@ -1,29 +1,20 @@
 import React, { useRef, useEffect, useState } from 'react';
 import {
-  View, Text, TouchableOpacity, StyleSheet, Animated, Dimensions, Platform,
+  View, Text, TouchableOpacity, StyleSheet, Animated, Dimensions, Platform, Image,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { colors } from '../theme';
+import { LinearGradient } from 'expo-linear-gradient';
+import { colors, fontFamily } from '../theme';
 import {
   signInWithGoogle, onAuthStateChange, getSession, isSupabaseConfigured,
 } from '../services/authService';
 
 const { width, height } = Dimensions.get('window');
 
-// Inline SVGs as text components (React Native SVG)
-import Svg, { Circle, Ellipse, Line, Path, Rect } from 'react-native-svg';
-
-const PaddleLogo = () => (
-  <Svg width={36} height={36} viewBox="0 0 36 36" fill="none">
-    <Circle cx={18} cy={18} r={17} stroke={colors.text} strokeWidth={1} />
-    <Line x1={18} y1={6} x2={18} y2={30} stroke={colors.text} strokeWidth={1.2} strokeLinecap="round" />
-    <Ellipse cx={18} cy={10} rx={4.5} ry={3.5} stroke={colors.text} strokeWidth={1} fill="none" />
-    <Ellipse cx={18} cy={26} rx={4.5} ry={3.5} stroke={colors.text} strokeWidth={1} fill="none" />
-  </Svg>
-);
+import Svg, { Path } from 'react-native-svg';
 
 const GoogleLogo = () => (
-  <Svg width={16} height={16} viewBox="0 0 16 16" fill="none">
+  <Svg width={18} height={18} viewBox="0 0 16 16" fill="none">
     <Path d="M15.5 8.2c0-.6-.1-1.1-.2-1.6H8v3h4.2c-.2 1-.8 1.8-1.6 2.3v2h2.6c1.5-1.4 2.3-3.4 2.3-5.7z" fill="#4285F4" />
     <Path d="M8 16c2.1 0 3.9-.7 5.2-1.9l-2.6-2c-.7.5-1.6.8-2.6.8-2 0-3.7-1.3-4.3-3.2H1v2c1.3 2.6 4 4.3 7 4.3z" fill="#34A853" />
     <Path d="M3.7 9.7c-.3-.8-.5-1.6-.5-2.5 0-.9.2-1.7.5-2.5V2.7H1C.4 3.9 0 5.4 0 7.2c0 1.8.4 3.3 1 4.5l2.7-2z" fill="#FBBC05" />
@@ -33,22 +24,22 @@ const GoogleLogo = () => (
 
 export default function SignInScreen({ navigation }) {
   const fadeAnim = useRef(new Animated.Value(0)).current;
-  const slideAnim = useRef(new Animated.Value(30)).current;
+  const slideAnim = useRef(new Animated.Value(40)).current;
+  const logoScale = useRef(new Animated.Value(0.8)).current;
   const [loading, setLoading] = useState(false);
   const [authError, setAuthError] = useState(null);
 
   useEffect(() => {
     Animated.parallel([
-      Animated.timing(fadeAnim, { toValue: 1, duration: 800, useNativeDriver: true }),
-      Animated.timing(slideAnim, { toValue: 0, duration: 700, useNativeDriver: true }),
+      Animated.timing(fadeAnim, { toValue: 1, duration: 900, useNativeDriver: true }),
+      Animated.timing(slideAnim, { toValue: 0, duration: 800, useNativeDriver: true }),
+      Animated.spring(logoScale, { toValue: 1, tension: 50, friction: 7, useNativeDriver: true }),
     ]).start();
 
-    // If already signed in (e.g. returning from OAuth redirect on web), go straight to Home
     getSession().then(session => {
       if (session) navigation.replace('Home');
     });
 
-    // Listen for sign-in completing (fires after mobile OAuth or web redirect returns)
     const unsubscribe = onAuthStateChange(user => {
       if (user) navigation.replace('Home');
     });
@@ -64,74 +55,111 @@ export default function SignInScreen({ navigation }) {
     setLoading(true);
     try {
       await signInWithGoogle();
-      // Web: browser now redirects to Google — component will unmount, no further action needed.
-      // Mobile: WebBrowser session finishes, onAuthStateChange fires and navigates to Home.
     } catch (err) {
       setAuthError(err.message);
       setLoading(false);
     }
-    // On web the page redirects away, so don't clear loading state there.
     if (Platform.OS !== 'web') setLoading(false);
   };
 
   return (
     <View style={s.container}>
-      {/* Subtle map background */}
-      <View style={s.mapBg}>
-        <View style={s.mapWater} />
-        <View style={s.mapLand1} />
-        <View style={s.mapLand2} />
-        <View style={s.mapGreen} />
-        <View style={s.mapFade} />
+      {/* Gradient background matching the turtle icon */}
+      <LinearGradient
+        colors={['#00D4FF', '#1479E8', '#2A5CE8', '#4040D0']}
+        start={{ x: 0, y: 0 }}
+        end={{ x: 1, y: 1 }}
+        style={s.gradient}
+      />
+
+      {/* Subtle water-like decorative shapes */}
+      <View style={s.decorWrap}>
+        <View style={s.decorCircle1} />
+        <View style={s.decorCircle2} />
+        <View style={s.decorCircle3} />
       </View>
 
       <SafeAreaView style={s.safe}>
-        <Animated.View style={[s.content, { opacity: fadeAnim, transform: [{ translateY: slideAnim }] }]}>
-
-          <PaddleLogo />
+        {/* Top section: logo + branding */}
+        <Animated.View style={[s.logoSection, { opacity: fadeAnim, transform: [{ scale: logoScale }] }]}>
+          <View style={s.logoContainer}>
+            <Image
+              source={require('../../assets/icons/tortuga/ios/AppIcon-1024.png')}
+              style={s.logoImage}
+            />
+          </View>
           <Text style={s.title}>Solvaa</Text>
           <Text style={s.tagline}>Know the water before you go</Text>
+        </Animated.View>
 
-          <View style={s.divider} />
+        {/* Bottom section: auth buttons */}
+        <Animated.View style={[s.bottomSection, { opacity: fadeAnim, transform: [{ translateY: slideAnim }] }]}>
+          <View style={s.authCard}>
+            {authError ? <Text style={s.errorText}>{authError}</Text> : null}
 
-          {authError ? <Text style={s.errorText}>{authError}</Text> : null}
+            <TouchableOpacity style={s.btnGoogle} onPress={handleGoogleAuth} activeOpacity={0.85} disabled={loading}>
+              <View style={s.btnLogo}><GoogleLogo /></View>
+              <Text style={s.btnGoogleText}>{loading ? 'Signing in...' : 'Continue with Google'}</Text>
+            </TouchableOpacity>
 
-          {/* Google */}
-          <TouchableOpacity style={s.btnLight} onPress={handleGoogleAuth} activeOpacity={0.85} disabled={loading}>
-            <View style={s.btnLogo}><GoogleLogo /></View>
-            <Text style={s.btnTextLight}>{loading ? 'Signing in…' : 'Continue with Google'}</Text>
-          </TouchableOpacity>
-
-          <Text style={s.terms}>
-            By continuing you agree to our{'\n'}
-            <Text style={s.termsLink}>Terms of Service</Text> and <Text style={s.termsLink}>Privacy Policy</Text>
-          </Text>
+            <Text style={s.terms}>
+              By continuing you agree to our{'\n'}
+              <Text style={s.termsLink}>Terms of Service</Text> and <Text style={s.termsLink}>Privacy Policy</Text>
+            </Text>
+          </View>
         </Animated.View>
       </SafeAreaView>
     </View>
   );
 }
 
+const FF = fontFamily;
 const s = StyleSheet.create({
-  container: { flex: 1, backgroundColor: colors.bg },
-  mapBg: { position: 'absolute', inset: 0, overflow: 'hidden' },
-  mapWater: { position: 'absolute', inset: 0, backgroundColor: colors.mapWater, opacity: 0.4 },
-  mapLand1: { position: 'absolute', top: 0, left: 0, width: 115, height: 230, borderBottomRightRadius: 38, backgroundColor: colors.mapLand, opacity: 0.35 },
-  mapLand2: { position: 'absolute', top: 0, right: 0, width: 95, height: 190, borderBottomLeftRadius: 28, backgroundColor: colors.mapLand, opacity: 0.3 },
-  mapGreen: { position: 'absolute', top: 18, left: 14, width: 58, height: 50, borderRadius: 8, backgroundColor: colors.mapGreen, opacity: 0.45 },
-  mapFade: { position: 'absolute', inset: 0, backgroundColor: colors.bg, opacity: 0, top: '28%' },
+  container: { flex: 1, backgroundColor: '#1479E8' },
+
+  gradient: { position: 'absolute', top: 0, left: 0, right: 0, bottom: 0 },
+
+  // Decorative translucent circles for depth
+  decorWrap: { position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, overflow: 'hidden' },
+  decorCircle1: { position: 'absolute', top: -80, right: -60, width: 280, height: 280, borderRadius: 140, backgroundColor: 'rgba(0,212,255,0.12)' },
+  decorCircle2: { position: 'absolute', top: height * 0.25, left: -100, width: 220, height: 220, borderRadius: 110, backgroundColor: 'rgba(64,64,208,0.1)' },
+  decorCircle3: { position: 'absolute', bottom: -40, right: -40, width: 180, height: 180, borderRadius: 90, backgroundColor: 'rgba(0,180,255,0.08)' },
+
   safe: { flex: 1 },
-  content: {
-    flex: 1, alignItems: 'center', justifyContent: 'flex-end',
-    paddingHorizontal: 24, paddingBottom: 32,
+
+  // Logo section (centered in upper half)
+  logoSection: { flex: 1, alignItems: 'center', justifyContent: 'center', paddingBottom: 20 },
+  logoContainer: {
+    width: 110, height: 110, borderRadius: 28,
+    overflow: 'hidden',
+    shadowColor: '#000', shadowOffset: { width: 0, height: 8 },
+    shadowOpacity: 0.3, shadowRadius: 20, elevation: 8,
+    marginBottom: 20,
   },
-  title: { fontSize: 26, fontWeight: '600', color: colors.text, marginTop: 12, marginBottom: 3 },
-  tagline: { fontSize: 12, fontWeight: '300', color: colors.textMuted, marginBottom: 36 },
-  divider: { width: 32, height: 1, backgroundColor: colors.border, marginBottom: 32 },
-  btnLight: { width: '100%', backgroundColor: colors.white, borderRadius: 10, padding: 13, flexDirection: 'row', alignItems: 'center', gap: 12, marginBottom: 10, borderWidth: 1, borderColor: colors.border },
-  btnLogo: { width: 20, height: 20, alignItems: 'center', justifyContent: 'center', flexShrink: 0 },
-  btnTextLight: { flex: 1, textAlign: 'center', fontSize: 13.5, fontWeight: '400', color: colors.text },
-  terms: { fontSize: 10, fontWeight: '300', color: colors.textFaint, textAlign: 'center', marginTop: 18, lineHeight: 16 },
-  termsLink: { color: '#7a9a8a' },
-  errorText: { fontSize: 11, color: '#8a4a3a', textAlign: 'center', marginBottom: 8 },
+  logoImage: { width: 110, height: 110 },
+  title: { fontSize: 32, fontWeight: '600', fontFamily: FF.semibold, color: '#fff', letterSpacing: 0.5 },
+  tagline: { fontSize: 15, fontWeight: '400', fontFamily: FF.regular, color: 'rgba(255,255,255,0.7)', marginTop: 6 },
+
+  // Bottom auth section
+  bottomSection: { paddingHorizontal: 24, paddingBottom: 28 },
+  authCard: {
+    backgroundColor: 'rgba(255,255,255,0.95)', borderRadius: 22,
+    padding: 24, paddingTop: 28,
+    shadowColor: '#000', shadowOffset: { width: 0, height: -4 },
+    shadowOpacity: 0.1, shadowRadius: 20, elevation: 8,
+  },
+
+  btnGoogle: {
+    width: '100%', backgroundColor: '#fff', borderRadius: 14,
+    paddingVertical: 16, paddingHorizontal: 20,
+    flexDirection: 'row', alignItems: 'center', gap: 14,
+    shadowColor: '#000', shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.06, shadowRadius: 8, elevation: 2,
+  },
+  btnLogo: { width: 22, height: 22, alignItems: 'center', justifyContent: 'center', flexShrink: 0 },
+  btnGoogleText: { flex: 1, textAlign: 'center', fontSize: 16, fontWeight: '500', fontFamily: FF.medium, color: '#1a1a1a' },
+
+  terms: { fontSize: 12, fontWeight: '400', fontFamily: FF.regular, color: '#9a9590', textAlign: 'center', marginTop: 20, lineHeight: 18 },
+  termsLink: { color: '#1479E8' },
+  errorText: { fontSize: 13, color: '#C54A3A', textAlign: 'center', marginBottom: 12, fontWeight: '500', fontFamily: FF.medium },
 });

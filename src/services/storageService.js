@@ -118,12 +118,17 @@ export async function getHistory() {
       serverId:         p.id,
       distancePaddled:  p.distance_km,
       durationSeconds:  p.duration_seconds,
+      avgSpeed:         p.avg_speed_knots,
+      maxSpeed:         p.max_speed_knots,
       completedAt:      new Date(p.finished_at || p.created_at).getTime(),
+      startedAt:        new Date(p.started_at || p.created_at).getTime(),
       route:            p.trips?.route_data,
       skillLevel:       { label: 'Intermediate' },
       tripType:         { label: p.trips?.trip_type || 'Day trip' },
       weather:          { current: p.weather_log?.[0] },
       location:         p.trips?.location_name,
+      gpsTrack:         Array.isArray(p.gps_track) ? p.gps_track : [],
+      notes:            p.notes,
     }));
     // Also update local cache
     await AsyncStorage.setItem(KEYS.HISTORY, JSON.stringify(normalised));
@@ -146,6 +151,21 @@ export async function getPaddleStats() {
       total_km:    +history.reduce((s, t) => s + (t.distancePaddled || 0), 0).toFixed(2),
       total_hours: +(history.reduce((s, t) => s + (t.durationSeconds || 0), 0) / 3600).toFixed(1),
     };
+  }
+}
+
+export async function deleteFromHistory(id) {
+  // Remove from local cache
+  const raw = await AsyncStorage.getItem(KEYS.HISTORY);
+  if (raw) {
+    const history = JSON.parse(raw).filter(p => p.id !== id && p.serverId !== id);
+    await AsyncStorage.setItem(KEYS.HISTORY, JSON.stringify(history));
+  }
+  // Delete from server
+  try {
+    await api.paddles.delete(id);
+  } catch (_) {
+    // Offline — local cache already updated
   }
 }
 

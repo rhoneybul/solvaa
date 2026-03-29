@@ -10,7 +10,7 @@
     "splash": {
       "image": "./assets/icons/tortuga/ios/AppIcon-1024.png",
       "resizeMode": "contain",
-      "backgroundColor": "#1479e8"
+      "backgroundColor": "#1a6de8"
     },
     "ios": {
       "supportsTablet": false,
@@ -42,8 +42,8 @@
       "name": "Solvaa",
       "shortName": "Solvaa",
       "description": "Know the water before you go — AI-powered kayak trip planning",
-      "themeColor": "#3a6a4a",
-      "backgroundColor": "#f2f1ed",
+      "themeColor": "#E8862A",
+      "backgroundColor": "#f4f3ef",
       "preferRelatedApplications": false
     },
     "plugins": [
@@ -61,7 +61,8 @@
         }
       ],
       "expo-web-browser",
-      "@react-native-community/datetimepicker"
+      "@react-native-community/datetimepicker",
+      "expo-font"
     ],
     "extra": {
       "stravaClientId": "",

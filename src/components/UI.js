@@ -1,7 +1,7 @@
 import React, { useRef, useEffect } from 'react';
 import { View, Text, TouchableOpacity, StyleSheet, Animated, PanResponder, Platform } from 'react-native';
 import Svg, { Path } from 'react-native-svg';
-import { colors, layout, text, sheetHandle } from '../theme';
+import { colors, layout, text, sheetHandle, fontFamily } from '../theme';
 
 // ── Layout ────────────────────────────────────────────────────────────────────
 
@@ -117,11 +117,11 @@ export const ProgressBar = ({ startLabel, endLabel, pct, color }) => (
   <View style={s.progressWrap}>
     <View style={s.progressLabels}>
       <Text style={s.progressLabel}>{startLabel}</Text>
-      <Text style={[s.progressPct, { color: color || colors.blue }]}>{Math.round(pct)}% complete</Text>
+      <Text style={[s.progressPct, { color: color || colors.primary }]}>{Math.round(pct)}% complete</Text>
       <Text style={s.progressLabel}>{endLabel}</Text>
     </View>
     <View style={s.progressTrack}>
-      <View style={[s.progressFill, { width: `${Math.min(100, pct)}%`, backgroundColor: color || colors.blue }]} />
+      <View style={[s.progressFill, { width: `${Math.min(100, pct)}%`, backgroundColor: color || colors.primary }]} />
     </View>
   </View>
 );
@@ -153,7 +153,7 @@ export const CampsiteCard = ({ name, nearRoute, distKm, type, beach, water, sour
   <View style={[s.campsiteCard, selected && s.campsiteCardSelected]}>
     <View style={s.campsiteHeader}>
       <View style={s.campsiteIcon}>
-        <Text style={s.campsiteIconText}>⛺</Text>
+        <Text style={s.campsiteIconText}>{'\u26FA'}</Text>
       </View>
       <Text style={s.campsiteName}>{name}</Text>
       <Text style={s.campsiteDist}>{distKm} km</Text>
@@ -251,7 +251,7 @@ export const SegmentedControl = ({ options, value, onChange, style }) => {
   useEffect(() => {
     const idx = options.findIndex(o => o === value);
     if (idx >= 0 && containerWidth.current > 0) {
-      const segWidth = (containerWidth.current - 4) / count; // minus 4px total padding
+      const segWidth = (containerWidth.current - 6) / count;
       Animated.spring(slideAnim, {
         toValue: idx * segWidth,
         useNativeDriver: false,
@@ -265,7 +265,7 @@ export const SegmentedControl = ({ options, value, onChange, style }) => {
     containerWidth.current = e.nativeEvent.layout.width;
     const idx = options.findIndex(o => o === value);
     if (idx >= 0) {
-      const segWidth = (e.nativeEvent.layout.width - 4) / count;
+      const segWidth = (e.nativeEvent.layout.width - 6) / count;
       slideAnim.setValue(idx * segWidth);
     }
   };
@@ -277,7 +277,7 @@ export const SegmentedControl = ({ options, value, onChange, style }) => {
         style={[
           s.segIndicator,
           {
-            width: containerWidth.current > 0 ? (containerWidth.current - 4) / count : `${100 / count}%`,
+            width: containerWidth.current > 0 ? (containerWidth.current - 6) / count : `${100 / count}%`,
             transform: [{ translateX: slideAnim }],
           },
         ]}
@@ -367,108 +367,128 @@ export const NavigateToStartButton = ({ onPress, disabled, style }) => (
 
 // ── Styles ────────────────────────────────────────────────────────────────────
 
-const P = 16; // page padding
+const P = 20; // page padding
+const R = 18; // card radius
+const FF = fontFamily;
 const s = StyleSheet.create({
-  sectionHeader: { paddingHorizontal: P, paddingTop: 12, paddingBottom: 4, fontSize: 11, fontWeight: '600', color: colors.textMuted, textTransform: 'uppercase', letterSpacing: 0.6 },
-  card: { marginHorizontal: P, marginBottom: 10, backgroundColor: colors.white, borderRadius: 14, borderWidth: 1, borderColor: colors.borderLight, shadowColor: '#1e3a8a', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.08, shadowRadius: 8, elevation: 3, overflow: 'hidden' },
-  cardSelected: { borderWidth: 1.5, borderColor: colors.primary },
-  row: { flexDirection: 'row', alignItems: 'center', paddingHorizontal: P, paddingVertical: 11, borderBottomWidth: 0.5, borderBottomColor: colors.borderLight, gap: 10, minHeight: 44 },
-  rowLabel: { flex: 1, fontSize: 13, fontWeight: '400', color: colors.text },
-  rowValue: { fontSize: 12, fontWeight: '400', color: colors.textMuted },
-  chevron: { color: colors.textFaint, fontSize: 11, marginLeft: 2 },
-  metricStrip: { flexDirection: 'row', marginHorizontal: P, marginBottom: 10, backgroundColor: colors.white, borderRadius: 14, overflow: 'hidden', borderWidth: 1, borderColor: colors.borderLight, shadowColor: '#1e3a8a', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.08, shadowRadius: 8, elevation: 3 },
-  metricCell: { flex: 1, paddingVertical: 12, paddingHorizontal: 6, alignItems: 'center' },
+  sectionHeader: { paddingHorizontal: P, paddingTop: 16, paddingBottom: 6, fontSize: 13, fontWeight: '600', fontFamily: FF.semibold, color: colors.textMuted, textTransform: 'uppercase', letterSpacing: 0.7 },
+
+  card: { marginHorizontal: P, marginBottom: 12, backgroundColor: colors.white, borderRadius: R, shadowColor: '#1a1d26', shadowOffset: { width: 0, height: 3 }, shadowOpacity: 0.06, shadowRadius: 14, elevation: 3, overflow: 'hidden' },
+  cardSelected: { borderWidth: 2, borderColor: colors.primary },
+
+  row: { flexDirection: 'row', alignItems: 'center', paddingHorizontal: 18, paddingVertical: 15, borderBottomWidth: 0.5, borderBottomColor: colors.borderLight, gap: 12, minHeight: 52 },
+  rowLabel: { flex: 1, fontSize: 15, fontWeight: '400', fontFamily: FF.regular, color: colors.text },
+  rowValue: { fontSize: 14, fontWeight: '400', fontFamily: FF.regular, color: colors.textMuted },
+  chevron: { color: colors.textFaint, fontSize: 14, marginLeft: 2 },
+
+  metricStrip: { flexDirection: 'row', marginHorizontal: P, marginBottom: 12, backgroundColor: colors.white, borderRadius: R, overflow: 'hidden', shadowColor: '#1a1d26', shadowOffset: { width: 0, height: 3 }, shadowOpacity: 0.06, shadowRadius: 14, elevation: 3 },
+  metricCell: { flex: 1, paddingVertical: 14, paddingHorizontal: 8, alignItems: 'center' },
   metricCellBorder: { borderRightWidth: 0.5, borderRightColor: colors.borderLight },
-  metricLabel: { fontSize: 8, fontWeight: '500', color: colors.textMuted, textTransform: 'uppercase', letterSpacing: 0.6, marginBottom: 3 },
-  metricValue: { fontSize: 17, fontWeight: '500', color: colors.text, lineHeight: 20 },
-  metricSub: { fontSize: 8, fontWeight: '400', color: colors.textMuted },
-  condLayer: { flexDirection: 'row', alignItems: 'center', paddingHorizontal: P, paddingVertical: 10, borderBottomWidth: 0.5, borderBottomColor: colors.borderLight, position: 'relative', gap: 10 },
-  condBar: { position: 'absolute', left: 0, top: 0, bottom: 0, width: 3 },
-  condIcon: { width: 28, height: 28, alignItems: 'center', justifyContent: 'center', flexShrink: 0 },
+  metricLabel: { fontSize: 10, fontWeight: '500', fontFamily: FF.medium, color: colors.textMuted, textTransform: 'uppercase', letterSpacing: 0.6, marginBottom: 4 },
+  metricValue: { fontSize: 19, fontWeight: '500', fontFamily: FF.medium, color: colors.text, lineHeight: 22 },
+  metricSub: { fontSize: 10, fontWeight: '400', fontFamily: FF.regular, color: colors.textMuted, marginTop: 1 },
+
+  condLayer: { flexDirection: 'row', alignItems: 'center', paddingHorizontal: 18, paddingVertical: 14, borderBottomWidth: 0.5, borderBottomColor: colors.borderLight, position: 'relative', gap: 12 },
+  condBar: { position: 'absolute', left: 0, top: 0, bottom: 0, width: 3, borderRadius: 2 },
+  condIcon: { width: 32, height: 32, alignItems: 'center', justifyContent: 'center', flexShrink: 0 },
   condMain: { flex: 1 },
-  condName: { fontSize: 12, fontWeight: '500', color: colors.text, marginBottom: 1 },
-  condDesc: { fontSize: 10, fontWeight: '400', color: colors.textMuted },
-  condMeter: { marginTop: 5, height: 3, backgroundColor: colors.borderLight, borderRadius: 2, overflow: 'hidden' },
+  condName: { fontSize: 14, fontWeight: '500', fontFamily: FF.medium, color: colors.text, marginBottom: 2 },
+  condDesc: { fontSize: 12, fontWeight: '400', fontFamily: FF.regular, color: colors.textMuted },
+  condMeter: { marginTop: 6, height: 3, backgroundColor: colors.borderLight, borderRadius: 2, overflow: 'hidden' },
   condFill: { height: '100%', borderRadius: 2 },
   condRight: { alignItems: 'flex-end' },
-  condVal: { fontSize: 18, fontWeight: '500', lineHeight: 20 },
-  condUnit: { fontSize: 9, fontWeight: '400', color: colors.textMuted },
-  primaryBtn: { marginHorizontal: P, marginBottom: 10, backgroundColor: colors.primary, borderRadius: 14, padding: 14, alignItems: 'center', shadowColor: colors.primary, shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.25, shadowRadius: 8, elevation: 4 },
-  primaryBtnText: { fontSize: 14, fontWeight: '600', color: '#fff' },
-  ghostBtn: { marginHorizontal: P, marginBottom: 10, borderRadius: 14, padding: 12, alignItems: 'center', borderWidth: 1, borderColor: colors.border },
-  ghostBtnText: { fontSize: 13, fontWeight: '500', color: colors.textMid },
-  sosBtn: { marginHorizontal: P, marginBottom: 10, backgroundColor: colors.sos, borderRadius: 14, padding: 14, flexDirection: 'row', alignItems: 'center', gap: 10, shadowColor: colors.sos, shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.3, shadowRadius: 8, elevation: 4 },
-  sosIcon: { width: 24, height: 24, borderRadius: 12, backgroundColor: 'rgba(255,255,255,0.2)', alignItems: 'center', justifyContent: 'center' },
-  sosIconText: { fontSize: 13, fontWeight: '700', color: 'white' },
-  sosBtnText: { fontSize: 13, fontWeight: '600', color: 'white' },
-  sosSubText: { fontSize: 9, fontWeight: '400', color: 'rgba(255,255,255,0.65)', marginTop: 1 },
-  stopBtn: { marginHorizontal: P, marginBottom: 10, backgroundColor: colors.warnLight, borderRadius: 14, padding: 14, alignItems: 'center', borderWidth: 1, borderColor: colors.warnBorder },
-  stopBtnText: { fontSize: 14, fontWeight: '600', color: colors.warn },
-  alert: { marginHorizontal: P, marginBottom: 10, borderRadius: 12, padding: 12, paddingHorizontal: 14, borderWidth: 1 },
-  alertTitle: { fontSize: 12, fontWeight: '600', marginBottom: 3 },
-  alertBody: { fontSize: 11, fontWeight: '400', lineHeight: 17 },
-  progressWrap: { paddingHorizontal: P, paddingVertical: 10, borderTopWidth: 0.5, borderTopColor: colors.borderLight },
-  progressLabels: { flexDirection: 'row', justifyContent: 'space-between', marginBottom: 6 },
-  progressLabel: { fontSize: 10, fontWeight: '400', color: colors.textMuted },
-  progressPct: { fontSize: 10, fontWeight: '600' },
+  condVal: { fontSize: 20, fontWeight: '500', fontFamily: FF.medium, lineHeight: 22 },
+  condUnit: { fontSize: 11, fontWeight: '400', fontFamily: FF.regular, color: colors.textMuted, marginTop: 1 },
+
+  primaryBtn: { marginHorizontal: P, marginBottom: 12, backgroundColor: colors.primary, borderRadius: 16, paddingVertical: 16, paddingHorizontal: 20, alignItems: 'center', shadowColor: colors.primary, shadowOffset: { width: 0, height: 6 }, shadowOpacity: 0.25, shadowRadius: 12, elevation: 4 },
+  primaryBtnText: { fontSize: 16, fontWeight: '600', fontFamily: FF.semibold, color: '#fff' },
+
+  ghostBtn: { marginHorizontal: P, marginBottom: 12, borderRadius: 16, paddingVertical: 14, paddingHorizontal: 20, alignItems: 'center', borderWidth: 1.5, borderColor: colors.border },
+  ghostBtnText: { fontSize: 15, fontWeight: '500', fontFamily: FF.medium, color: colors.textMid },
+
+  sosBtn: { marginHorizontal: P, marginBottom: 12, backgroundColor: colors.sos, borderRadius: 16, paddingVertical: 16, paddingHorizontal: 18, flexDirection: 'row', alignItems: 'center', gap: 12, shadowColor: colors.sos, shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.25, shadowRadius: 10, elevation: 4 },
+  sosIcon: { width: 28, height: 28, borderRadius: 14, backgroundColor: 'rgba(255,255,255,0.2)', alignItems: 'center', justifyContent: 'center' },
+  sosIconText: { fontSize: 15, fontWeight: '700', fontFamily: FF.semibold, color: 'white' },
+  sosBtnText: { fontSize: 15, fontWeight: '600', fontFamily: FF.semibold, color: 'white' },
+  sosSubText: { fontSize: 11, fontWeight: '400', fontFamily: FF.regular, color: 'rgba(255,255,255,0.65)', marginTop: 2 },
+
+  stopBtn: { marginHorizontal: P, marginBottom: 12, backgroundColor: colors.warnLight, borderRadius: 16, paddingVertical: 16, alignItems: 'center', borderWidth: 1, borderColor: colors.warnBorder },
+  stopBtnText: { fontSize: 16, fontWeight: '600', fontFamily: FF.semibold, color: colors.warn },
+
+  alert: { marginHorizontal: P, marginBottom: 12, borderRadius: 16, padding: 16, borderWidth: 1 },
+  alertTitle: { fontSize: 14, fontWeight: '600', fontFamily: FF.semibold, marginBottom: 4 },
+  alertBody: { fontSize: 13, fontWeight: '400', fontFamily: FF.regular, lineHeight: 19 },
+
+  progressWrap: { paddingHorizontal: P, paddingVertical: 12, borderTopWidth: 0.5, borderTopColor: colors.borderLight },
+  progressLabels: { flexDirection: 'row', justifyContent: 'space-between', marginBottom: 8 },
+  progressLabel: { fontSize: 12, fontWeight: '400', fontFamily: FF.regular, color: colors.textMuted },
+  progressPct: { fontSize: 12, fontWeight: '600', fontFamily: FF.semibold },
   progressTrack: { height: 4, backgroundColor: colors.borderLight, borderRadius: 2, overflow: 'hidden' },
   progressFill: { height: '100%', borderRadius: 2 },
-  authBtn: { width: '100%', padding: 13, paddingHorizontal: 16, borderRadius: 14, flexDirection: 'row', alignItems: 'center', gap: 12, marginBottom: 10 },
-  authBtnDark: { backgroundColor: colors.primary },
+
+  authBtn: { width: '100%', paddingVertical: 16, paddingHorizontal: 20, borderRadius: 16, flexDirection: 'row', alignItems: 'center', gap: 12, marginBottom: 12 },
+  authBtnDark: { backgroundColor: colors.primary, shadowColor: colors.primary, shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.2, shadowRadius: 10, elevation: 4 },
   authBtnLight: { backgroundColor: colors.white, borderWidth: 1, borderColor: colors.border },
-  authLogo: { width: 18, height: 18, alignItems: 'center', justifyContent: 'center', flexShrink: 0 },
-  authBtnText: { flex: 1, textAlign: 'center', fontSize: 14, fontWeight: '500' },
+  authLogo: { width: 20, height: 20, alignItems: 'center', justifyContent: 'center', flexShrink: 0 },
+  authBtnText: { flex: 1, textAlign: 'center', fontSize: 16, fontWeight: '500', fontFamily: FF.medium },
   authBtnTextDark: { color: '#fff' },
   authBtnTextLight: { color: colors.text },
-  toggle: { width: 40, height: 24, borderRadius: 12, position: 'relative' },
+
+  toggle: { width: 44, height: 26, borderRadius: 13, position: 'relative' },
   toggleOn: { backgroundColor: colors.primary },
   toggleOff: { backgroundColor: colors.borderLight },
-  toggleThumb: { width: 20, height: 20, borderRadius: 10, backgroundColor: 'white', position: 'absolute', top: 2, shadowColor: '#000', shadowOffset: { width: 0, height: 1 }, shadowOpacity: 0.2, shadowRadius: 2, elevation: 2 },
+  toggleThumb: { width: 22, height: 22, borderRadius: 11, backgroundColor: 'white', position: 'absolute', top: 2, shadowColor: '#000', shadowOffset: { width: 0, height: 1 }, shadowOpacity: 0.15, shadowRadius: 3, elevation: 2 },
   toggleThumbOn: { right: 2 },
   toggleThumbOff: { left: 2 },
-  campsiteCard: { marginHorizontal: P, marginBottom: 10, backgroundColor: colors.white, borderRadius: 14, borderWidth: 1, borderColor: colors.borderLight, overflow: 'hidden', shadowColor: '#1e3a8a', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.08, shadowRadius: 8, elevation: 3 },
-  campsiteCardSelected: { borderWidth: 1.5, borderColor: colors.primary },
-  campsiteHeader: { flexDirection: 'row', alignItems: 'center', padding: P - 2, gap: 10, borderBottomWidth: 0.5, borderBottomColor: colors.borderLight },
-  campsiteIcon: { width: 30, height: 30, borderRadius: 8, backgroundColor: colors.campLight, alignItems: 'center', justifyContent: 'center', flexShrink: 0 },
-  campsiteIconText: { fontSize: 14 },
-  campsiteName: { flex: 1, fontSize: 13, fontWeight: '600', color: colors.text },
-  campsiteDist: { fontSize: 11, fontWeight: '400', color: colors.textMuted },
+
+  campsiteCard: { marginHorizontal: P, marginBottom: 12, backgroundColor: colors.white, borderRadius: R, overflow: 'hidden', shadowColor: '#1a1d26', shadowOffset: { width: 0, height: 3 }, shadowOpacity: 0.06, shadowRadius: 14, elevation: 3 },
+  campsiteCardSelected: { borderWidth: 2, borderColor: colors.primary },
+  campsiteHeader: { flexDirection: 'row', alignItems: 'center', padding: 16, gap: 12, borderBottomWidth: 0.5, borderBottomColor: colors.borderLight },
+  campsiteIcon: { width: 36, height: 36, borderRadius: 10, backgroundColor: colors.primaryLight, alignItems: 'center', justifyContent: 'center', flexShrink: 0 },
+  campsiteIconText: { fontSize: 16 },
+  campsiteName: { flex: 1, fontSize: 15, fontWeight: '600', fontFamily: FF.semibold, color: colors.text },
+  campsiteDist: { fontSize: 13, fontWeight: '400', fontFamily: FF.regular, color: colors.textMuted },
   campsiteStats: { flexDirection: 'row' },
-  campStat: { flex: 1, padding: 8, paddingHorizontal: 12, borderRightWidth: 0.5, borderRightColor: colors.borderLight },
-  campStatL: { fontSize: 8, fontWeight: '500', color: colors.textMuted, textTransform: 'uppercase', letterSpacing: 0.4, marginBottom: 2 },
-  campStatV: { fontSize: 12, fontWeight: '500', color: colors.text },
-  tabBar: { flexDirection: 'row', marginHorizontal: P, marginBottom: 10, backgroundColor: colors.bgDeep, borderRadius: 10, padding: 3, gap: 2 },
-  tab: { flex: 1, padding: 8, alignItems: 'center', borderRadius: 8 },
-  tabActive: { backgroundColor: colors.white, shadowColor: '#1e3a8a', shadowOffset: { width: 0, height: 1 }, shadowOpacity: 0.1, shadowRadius: 4, elevation: 2 },
-  tabText: { fontSize: 12, fontWeight: '400', color: colors.textMuted },
-  tabTextActive: { fontWeight: '600', color: colors.text },
+  campStat: { flex: 1, padding: 12, borderRightWidth: 0.5, borderRightColor: colors.borderLight },
+  campStatL: { fontSize: 10, fontWeight: '500', fontFamily: FF.medium, color: colors.textMuted, textTransform: 'uppercase', letterSpacing: 0.4, marginBottom: 3 },
+  campStatV: { fontSize: 14, fontWeight: '500', fontFamily: FF.medium, color: colors.text },
+
+  tabBar: { flexDirection: 'row', marginHorizontal: P, marginBottom: 12, backgroundColor: colors.bgDeep, borderRadius: 14, padding: 3, gap: 2 },
+  tab: { flex: 1, paddingVertical: 10, alignItems: 'center', borderRadius: 12 },
+  tabActive: { backgroundColor: colors.white, shadowColor: '#000', shadowOffset: { width: 0, height: 1 }, shadowOpacity: 0.08, shadowRadius: 4, elevation: 2 },
+  tabText: { fontSize: 14, fontWeight: '400', fontFamily: FF.regular, color: colors.textMuted },
+  tabTextActive: { fontWeight: '600', fontFamily: FF.semibold, color: colors.text },
+
   // Slider
-  sliderWrap: { marginHorizontal: P, marginBottom: 10 },
-  sliderLabelRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 10 },
-  sliderLabel: { fontSize: 12, fontWeight: '500', color: colors.text },
-  sliderValueLabel: { fontSize: 13, fontWeight: '600', color: colors.primary },
+  sliderWrap: { marginHorizontal: P, marginBottom: 12 },
+  sliderLabelRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 },
+  sliderLabel: { fontSize: 14, fontWeight: '500', fontFamily: FF.medium, color: colors.text },
+  sliderValueLabel: { fontSize: 15, fontWeight: '600', fontFamily: FF.semibold, color: colors.primary },
   sliderTrack: { height: 6, backgroundColor: colors.borderLight, borderRadius: 3, position: 'relative', justifyContent: 'center' },
   sliderFill: { position: 'absolute', left: 0, top: 0, bottom: 0, backgroundColor: colors.primary, borderRadius: 3 },
-  sliderThumb: { position: 'absolute', width: 22, height: 22, borderRadius: 11, backgroundColor: colors.white, marginLeft: -11, top: -8, shadowColor: '#1e3a8a', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.2, shadowRadius: 4, elevation: 3, borderWidth: 2, borderColor: colors.primary },
-  sliderMinMax: { flexDirection: 'row', justifyContent: 'space-between', marginTop: 4 },
-  sliderBound: { fontSize: 9, fontWeight: '400', color: colors.textMuted },
+  sliderThumb: { position: 'absolute', width: 24, height: 24, borderRadius: 12, backgroundColor: colors.white, marginLeft: -12, top: -9, shadowColor: '#000', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.15, shadowRadius: 4, elevation: 3, borderWidth: 2.5, borderColor: colors.primary },
+  sliderMinMax: { flexDirection: 'row', justifyContent: 'space-between', marginTop: 6 },
+  sliderBound: { fontSize: 11, fontWeight: '400', fontFamily: FF.regular, color: colors.textMuted },
+
   // Segmented Control
-  segWrap: { flexDirection: 'row', marginHorizontal: P, marginBottom: 10, backgroundColor: colors.bgDeep, borderRadius: 10, padding: 3, position: 'relative', overflow: 'hidden' },
-  segIndicator: { position: 'absolute', top: 3, bottom: 3, left: 3, backgroundColor: colors.white, borderRadius: 8, shadowColor: '#1e3a8a', shadowOffset: { width: 0, height: 1 }, shadowOpacity: 0.1, shadowRadius: 4, elevation: 2 },
-  segOption: { flex: 1, padding: 8, alignItems: 'center', zIndex: 1 },
-  segText: { fontSize: 12, fontWeight: '400', color: colors.textMuted },
-  segTextActive: { fontWeight: '600', color: colors.text },
+  segWrap: { flexDirection: 'row', marginHorizontal: P, marginBottom: 12, backgroundColor: colors.bgDeep, borderRadius: 14, padding: 3, position: 'relative', overflow: 'hidden' },
+  segIndicator: { position: 'absolute', top: 3, bottom: 3, left: 3, backgroundColor: colors.white, borderRadius: 12, shadowColor: '#000', shadowOffset: { width: 0, height: 1 }, shadowOpacity: 0.08, shadowRadius: 4, elevation: 2 },
+  segOption: { flex: 1, paddingVertical: 10, alignItems: 'center', zIndex: 1 },
+  segText: { fontSize: 14, fontWeight: '400', fontFamily: FF.regular, color: colors.textMuted },
+  segTextActive: { fontWeight: '600', fontFamily: FF.semibold, color: colors.text },
+
   // Error State
-  errorStateWrap: { flex: 1, alignItems: 'center', justifyContent: 'center', paddingHorizontal: 32, paddingVertical: 40, gap: 8 },
-  errorStateIcon: { width: 44, height: 44, borderRadius: 22, backgroundColor: colors.warnLight, alignItems: 'center', justifyContent: 'center', marginBottom: 4, borderWidth: 1, borderColor: colors.warnBorder },
-  errorStateIconText: { fontSize: 20, fontWeight: '700', color: colors.warn },
-  errorStateTitle: { fontSize: 15, fontWeight: '600', color: colors.text, textAlign: 'center' },
-  errorStateBody: { fontSize: 13, fontWeight: '400', color: colors.textMuted, textAlign: 'center', lineHeight: 19 },
-  errorStateRetryBtn: { marginTop: 12, backgroundColor: colors.primary, borderRadius: 10, paddingHorizontal: 24, paddingVertical: 10 },
-  errorStateRetryText: { fontSize: 14, fontWeight: '600', color: '#fff' },
+  errorStateWrap: { flex: 1, alignItems: 'center', justifyContent: 'center', paddingHorizontal: 36, paddingVertical: 44, gap: 10 },
+  errorStateIcon: { width: 48, height: 48, borderRadius: 24, backgroundColor: colors.warnLight, alignItems: 'center', justifyContent: 'center', marginBottom: 6, borderWidth: 1, borderColor: colors.warnBorder },
+  errorStateIconText: { fontSize: 22, fontWeight: '700', fontFamily: FF.semibold, color: colors.warn },
+  errorStateTitle: { fontSize: 17, fontWeight: '600', fontFamily: FF.semibold, color: colors.text, textAlign: 'center' },
+  errorStateBody: { fontSize: 15, fontWeight: '400', fontFamily: FF.regular, color: colors.textMuted, textAlign: 'center', lineHeight: 21 },
+  errorStateRetryBtn: { marginTop: 14, backgroundColor: colors.primary, borderRadius: 14, paddingHorizontal: 28, paddingVertical: 12, shadowColor: colors.primary, shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.2, shadowRadius: 8, elevation: 3 },
+  errorStateRetryText: { fontSize: 15, fontWeight: '600', fontFamily: FF.semibold, color: '#fff' },
+
   // Navigate to Start
-  navStartBtn: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', backgroundColor: colors.primary, borderRadius: 10, paddingVertical: 12, paddingHorizontal: 16, marginHorizontal: P, marginBottom: 10, gap: 8 },
-  navStartBtnDisabled: { backgroundColor: colors.borderLight },
-  navStartBtnText: { fontSize: 13, fontWeight: '600', color: '#fff' },
+  navStartBtn: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', backgroundColor: colors.primary, borderRadius: 14, paddingVertical: 14, paddingHorizontal: 20, marginHorizontal: P, marginBottom: 12, gap: 8, shadowColor: colors.primary, shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.2, shadowRadius: 8, elevation: 3 },
+  navStartBtnDisabled: { backgroundColor: colors.borderLight, shadowOpacity: 0 },
+  navStartBtnText: { fontSize: 15, fontWeight: '600', fontFamily: FF.semibold, color: '#fff' },
   navStartBtnTextDisabled: { color: colors.textMuted },
 });

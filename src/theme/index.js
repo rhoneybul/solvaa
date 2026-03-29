@@ -1,48 +1,69 @@
 // ── Solvaa App Theme ─────────────────────────────────────────────────────────
-// Light, functional, map-focused. Single font: Inter.
-// Colour only for meaning (good/caution/warn), never decoration.
+// Clean, card-based. Font: Poppins.
+// Blue palette with depth — multiple shades for visual richness.
 
 export const colors = {
-  bg:           '#f5f6f8',   // app background
-  bgDeep:       '#eceef3',   // sunken areas
+  bg:           '#f0f2f5',   // cool light gray background
+  bgDeep:       '#e4e7ed',   // sunken areas
   white:        '#ffffff',
-  border:       '#e0e4ef',   // strong border
-  borderLight:  '#edf0f7',   // subtle divider
-  text:         '#111827',   // primary text
-  textMid:      '#4b5563',   // secondary text
-  textMuted:    '#9ca3af',   // labels / captions
-  textFaint:    '#d1d5db',   // placeholders
-  // Primary action colour
-  primary:      '#2563EB',
-  primaryLight: '#eff4ff',
-  primaryDark:  '#1d4ed8',
+  border:       '#dde1e8',   // subtle border
+  borderLight:  '#ebeef2',   // faint divider
+  text:         '#1a1d26',   // primary text
+  textMid:      '#4a4f5e',   // secondary text
+  textMuted:    '#8a8f9e',   // labels / captions
+  textFaint:    '#bcc1cc',   // placeholders
+  // Primary action colour — rich blue
+  primary:      '#4A6CF7',
+  primaryLight: '#EEF1FE',
+  primaryDark:  '#3A56D4',
+  // Extended blue palette for depth
+  blue50:       '#f0f3ff',
+  blue100:      '#dde4fe',
+  blue200:      '#b8c7fd',
+  blue300:      '#8aa4fb',
+  blue400:      '#6585f9',
+  blue500:      '#4A6CF7',
+  blue600:      '#3A56D4',
+  blue700:      '#2C42A8',
+  blue800:      '#1E2F7C',
+  blue900:      '#141F54',
+  // Accent blue — lighter, for highlights
+  accent:       '#60A5FA',
+  accentLight:  '#EFF6FF',
   // Functional status — use sparingly
-  good:         '#16a34a',
+  good:         '#22C55E',
   goodLight:    '#f0fdf4',
-  caution:      '#d97706',
-  cautionLight: '#fffbeb',
-  cautionBorder:'#fde68a',
-  warn:         '#dc2626',
-  warnLight:    '#fef2f2',
-  warnBorder:   '#fecaca',
-  blue:         '#2563EB',
-  blueLight:    '#eff4ff',
-  camp:         '#8a5a2a',
-  campLight:    '#8a5a2a18',
-  sos:          '#7a2020',
+  caution:      '#F59E0B',
+  cautionLight: '#FFFBEB',
+  cautionBorder:'#FDE68A',
+  warn:         '#EF4444',
+  warnLight:    '#FEF2F2',
+  warnBorder:   '#FECACA',
+  blue:         '#3B82F6',
+  blueLight:    '#EFF6FF',
+  camp:         '#92400E',
+  campLight:    '#92400E18',
+  sos:          '#DC2626',
   // Map palette
   mapWater:     '#bfdbfe',
-  mapLand:      '#e5e7eb',
-  mapLandShore: '#d1d5db',
-  mapLandBorder:'#9ca3af',
+  mapLand:      '#e2e8f0',
+  mapLandShore: '#cbd5e1',
+  mapLandBorder:'#94a3b8',
   mapGreen:     '#bbf7d0',
   mapDeepWater: '#93c5fd',
-  mapRoute:     '#2563EB',
-  mapRouteAlt:  '#9ca3af',
+  mapRoute:     '#4A6CF7',
+  mapRouteAlt:  '#94a3b8',
+};
+
+export const fontFamily = {
+  light:    'Poppins_300Light',
+  regular:  'Poppins_400Regular',
+  medium:   'Poppins_500Medium',
+  semibold: 'Poppins_600SemiBold',
 };
 
 export const font = {
-  // Inter weights only — never bold outside of headings
+  // Weight strings for StyleSheet (Poppins loaded via expo-font)
   thin:    '300',
   regular: '400',
   medium:  '500',
@@ -50,36 +71,34 @@ export const font = {
 };
 
 export const text = {
-  heading:    { fontSize: 15, fontWeight: '600', color: '#1a1a1a' },
-  subheading: { fontSize: 13, fontWeight: '600', color: '#1a1a1a' },
-  body:       { fontSize: 13, fontWeight: '400', color: '#1a1a1a' },
-  bodyLight:  { fontSize: 13, fontWeight: '300', color: '#5a5550' },
-  small:      { fontSize: 11, fontWeight: '300', color: '#6a6560' },
-  label:      { fontSize: 8,  fontWeight: '400', color: '#a09890', textTransform: 'uppercase', letterSpacing: 0.5 },
-  metric:     { fontSize: 22, fontWeight: '300', color: '#1a1a1a' },
-  metricMd:   { fontSize: 17, fontWeight: '500', color: '#1a1a1a' },
-  caption:    { fontSize: 9.5,fontWeight: '300', color: '#9a9590' },
+  heading:    { fontSize: 18, fontWeight: '600', color: colors.text, fontFamily: fontFamily.semibold },
+  subheading: { fontSize: 15, fontWeight: '600', color: colors.text, fontFamily: fontFamily.semibold },
+  body:       { fontSize: 15, fontWeight: '400', color: colors.text, fontFamily: fontFamily.regular },
+  bodyLight:  { fontSize: 15, fontWeight: '300', color: colors.textMid, fontFamily: fontFamily.light },
+  small:      { fontSize: 13, fontWeight: '300', color: colors.textMid, fontFamily: fontFamily.light },
+  label:      { fontSize: 10, fontWeight: '500', color: colors.textMuted, textTransform: 'uppercase', letterSpacing: 0.6, fontFamily: fontFamily.medium },
+  metric:     { fontSize: 26, fontWeight: '300', color: colors.text, fontFamily: fontFamily.light },
+  metricMd:   { fontSize: 19, fontWeight: '500', color: colors.text, fontFamily: fontFamily.medium },
+  caption:    { fontSize: 11, fontWeight: '300', color: colors.textMuted, fontFamily: fontFamily.light },
 };
 
 export const layout = {
-  pagePad:    16,
-  cardRadius: 14,
+  pagePad:    20,
+  cardRadius: 18,
   cardShadow: {
-    shadowColor: '#1e3a8a',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.08,
-    shadowRadius: 8,
+    shadowColor: '#1a1d26',
+    shadowOffset: { width: 0, height: 3 },
+    shadowOpacity: 0.06,
+    shadowRadius: 14,
     elevation: 3,
   },
   card: (extra = {}) => ({
     backgroundColor: '#ffffff',
-    borderRadius: 14,
-    borderWidth: 1,
-    borderColor: '#edf0f7',
-    shadowColor: '#1e3a8a',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.08,
-    shadowRadius: 8,
+    borderRadius: 18,
+    shadowColor: '#1a1d26',
+    shadowOffset: { width: 0, height: 3 },
+    shadowOpacity: 0.06,
+    shadowRadius: 14,
     elevation: 3,
     ...extra,
   }),
@@ -88,7 +107,7 @@ export const layout = {
 // Shared handle for bottom sheets
 export const sheetHandle = {
   width: 36, height: 4, borderRadius: 2,
-  backgroundColor: '#d1d5db',
+  backgroundColor: '#c8cdd6',
   alignSelf: 'center',
-  marginTop: 8, marginBottom: 6,
+  marginTop: 10, marginBottom: 8,
 };

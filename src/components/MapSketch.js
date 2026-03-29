@@ -1,7 +1,7 @@
 import React from 'react';
 import { View, Text, StyleSheet } from 'react-native';
 import Svg, { Path, Circle, Rect, Line, Ellipse } from 'react-native-svg';
-import { colors } from '../theme';
+import { colors, fontFamily } from '../theme';
 
 /**
  * MapSketch — CSS-drawn map used across Home, Routes, Tracking, Campsites.
@@ -296,6 +296,7 @@ export default function MapSketch({
   );
 }
 
+const FF = fontFamily;
 const styles = StyleSheet.create({
   container: { position: 'relative', overflow: 'hidden', flexShrink: 0 },
   water:     { position: 'absolute', top: 0, left: 0, right: 0, backgroundColor: colors.mapWater },
@@ -308,8 +309,8 @@ const styles = StyleSheet.create({
     backgroundColor: 'rgba(248,247,243,0.92)',
     borderRadius: 6, padding: 5, paddingHorizontal: 8,
   },
-  windChipMain: { fontSize: 9.5, fontWeight: '500', color: colors.caution },
-  windChipSub:  { fontSize: 8.5, fontWeight: '300', color: colors.textMuted, marginTop: 1 },
+  windChipMain: { fontSize: 9.5, fontWeight: '500', fontFamily: FF.medium, color: colors.caution },
+  windChipSub:  { fontSize: 8.5, fontWeight: '300', fontFamily: FF.light, color: colors.textMuted, marginTop: 1 },
   legend: {
     position: 'absolute', top: 8, left: 8,
     backgroundColor: 'rgba(248,247,243,0.9)',
@@ -318,20 +319,20 @@ const styles = StyleSheet.create({
   legendRow:  { flexDirection: 'row', alignItems: 'center', gap: 5, marginBottom: 3 },
   legendLine: { width: 12, height: 2, borderRadius: 1 },
   legendDot:  { width: 8, height: 8, borderRadius: 4, borderWidth: 1.5, borderColor: 'white' },
-  legendText: { fontSize: 8, fontWeight: '400', color: colors.text },
+  legendText: { fontSize: 8, fontWeight: '400', fontFamily: FF.regular, color: colors.text },
   etaChip: {
     position: 'absolute', bottom: 52, right: 8,
     backgroundColor: 'rgba(248,247,243,0.9)',
     borderRadius: 6, padding: 4, paddingHorizontal: 8, alignItems: 'center',
   },
-  etaNum:   { fontSize: 14, fontWeight: '500', color: colors.text, lineHeight: 16 },
-  etaLabel: { fontSize: 7.5, fontWeight: '300', color: colors.textMuted },
+  etaNum:   { fontSize: 14, fontWeight: '500', fontFamily: FF.medium, color: colors.text, lineHeight: 16 },
+  etaLabel: { fontSize: 7.5, fontWeight: '300', fontFamily: FF.light, color: colors.textMuted },
   // Location pin label
   pinLabel: {
     position: 'absolute', width: 80, alignItems: 'center',
   },
   pinLabelText: {
-    fontSize: 8, fontWeight: '500', color: colors.text,
+    fontSize: 8, fontWeight: '500', fontFamily: FF.medium, color: colors.text,
     backgroundColor: 'rgba(248,247,243,0.9)',
     borderRadius: 3, paddingHorizontal: 4, paddingVertical: 1,
     overflow: 'hidden', textAlign: 'center',
@@ -343,10 +344,10 @@ const styles = StyleSheet.create({
     shadowColor: '#000', shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.11, shadowRadius: 7, elevation: 3,
   },
-  overlayTitle: { fontSize: 12.5, fontWeight: '600', color: colors.text, marginBottom: 2 },
-  overlayMeta:  { fontSize: 10, fontWeight: '300', color: colors.textMid },
+  overlayTitle: { fontSize: 12.5, fontWeight: '600', fontFamily: FF.semibold, color: colors.text, marginBottom: 2 },
+  overlayMeta:  { fontSize: 10, fontWeight: '300', fontFamily: FF.light, color: colors.textMid },
   attr: {
     position: 'absolute', bottom: 3, right: 5,
-    fontSize: 6.5, fontWeight: '300', color: 'rgba(0,0,0,0.28)',
+    fontSize: 6.5, fontWeight: '300', fontFamily: FF.light, color: 'rgba(0,0,0,0.28)',
   },
 });

@@ -16,19 +16,19 @@
 import { useState } from 'react';
 import { View, Text, ScrollView, StyleSheet } from 'react-native';
 import Svg, { Path, Circle, Text as SvgText, Defs, LinearGradient, Stop } from 'react-native-svg';
-import { colors } from '../theme';
+import { colors, fontFamily } from '../theme';
 
-const COL_W    = 54;
+const COL_W    = 58;
 const BAR_MAX  = 40;
-const LABEL_W  = 52;
-const TIDE_H   = 64;   // height of the tide line chart row
+const LABEL_W  = 56;
+const TIDE_H   = 68;   // height of the tide line chart row
 
 const ROW_HEIGHTS = {
-  wind:  96,
-  temp:  56,
-  rain:  52,
-  swell: 72,
-  time:  20,
+  wind:  102,
+  temp:  60,
+  rain:  56,
+  swell: 76,
+  time:  24,
 };
 
 // ── Helpers ──────────────────────────────────────────────────────────────────
@@ -297,11 +297,11 @@ export default function ConditionsTimeline({ hourly = [], date, startHour, endHo
           horizontal
           showsHorizontalScrollIndicator={false}
           style={s.scrollArea}
-          contentContainerStyle={{ flexDirection: 'column' }}
+          contentContainerStyle={{ flexDirection: 'column', paddingRight: LABEL_W }}
           onLayout={e => setScrollW(e.nativeEvent.layout.width)}
         >
           {/* Hour columns */}
-          <View style={{ flexDirection: 'row', gap: 2 }}>
+          <View style={{ flexDirection: 'row', gap: 4 }}>
             {display.map((h, i) => (
               <TimeColumn
                 key={i}
@@ -339,33 +339,34 @@ export default function ConditionsTimeline({ hourly = [], date, startHour, endHo
   );
 }
 
+const FF = fontFamily;
 const s = StyleSheet.create({
-  wrap:    { marginHorizontal: 12, marginBottom: 8, backgroundColor: colors.white, borderRadius: 12, borderWidth: 1, borderColor: colors.borderLight, padding: 20, paddingBottom: 16 },
-  header:  { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 },
-  title:   { fontSize: 10, fontWeight: '600', color: colors.text, textTransform: 'uppercase', letterSpacing: 0.5 },
-  bearingNote: { fontSize: 9, fontWeight: '300', color: colors.textMuted },
+  wrap:    { marginHorizontal: 20, marginTop: 8, marginBottom: 14, backgroundColor: colors.white, borderRadius: 18, borderWidth: 0, paddingTop: 24, paddingBottom: 22, paddingHorizontal: 20, shadowColor: '#1e3a8a', shadowOffset: { width: 0, height: 3 }, shadowOpacity: 0.06, shadowRadius: 12, elevation: 3 },
+  header:  { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 22, paddingHorizontal: 4 },
+  title:   { fontSize: 11, fontWeight: '600', fontFamily: FF.semibold, color: colors.text, textTransform: 'uppercase', letterSpacing: 0.5 },
+  bearingNote: { fontSize: 10, fontWeight: '400', fontFamily: FF.regular, color: colors.textMuted },
 
   grid:        { flexDirection: 'row' },
   labelsCol:   { },
   scrollArea:  { flex: 1 },
 
-  rowLabelCell: { justifyContent: 'center', paddingRight: 6, borderBottomWidth: 0.5, borderBottomColor: colors.borderLight },
-  rowLabelText: { fontSize: 9, fontWeight: '600', color: colors.textMid },
-  rowLabelSub:  { fontSize: 7.5, fontWeight: '300', color: colors.textMuted },
+  rowLabelCell: { justifyContent: 'center', paddingRight: 14, borderBottomWidth: 0.5, borderBottomColor: colors.borderLight },
+  rowLabelText: { fontSize: 10, fontWeight: '600', fontFamily: FF.semibold, color: colors.textMid },
+  rowLabelSub:  { fontSize: 8, fontWeight: '400', fontFamily: FF.regular, color: colors.textMuted },
 
   col:     { alignItems: 'center' },
-  cell:    { alignItems: 'center', justifyContent: 'flex-end', paddingBottom: 2, borderBottomWidth: 0.5, borderBottomColor: colors.borderLight },
-  arrowWrap: { marginBottom: 1 },
-  arrow:   { fontSize: 12, lineHeight: 14 },
-  barWrap: { height: BAR_MAX, justifyContent: 'flex-end', marginBottom: 2 },
-  bar:     { width: 18, borderRadius: 2 },
-  val:     { fontSize: 9, fontWeight: '600', lineHeight: 11 },
-  sub:     { fontSize: 7.5, fontWeight: '300', color: colors.textMuted, lineHeight: 10 },
-  badge:   { borderRadius: 3, paddingHorizontal: 3, paddingVertical: 1, marginTop: 1 },
-  badgeText: { fontSize: 7, fontWeight: '700' },
-  badgePlaceholder: { height: 14 },
-  timeLabel: { fontSize: 8, fontWeight: '400', color: colors.textMid, textAlign: 'center' },
+  cell:    { alignItems: 'center', justifyContent: 'flex-end', paddingBottom: 3, borderBottomWidth: 0.5, borderBottomColor: colors.borderLight },
+  arrowWrap: { marginBottom: 2 },
+  arrow:   { fontSize: 12, fontFamily: FF.regular, lineHeight: 14 },
+  barWrap: { height: BAR_MAX, justifyContent: 'flex-end', marginBottom: 3 },
+  bar:     { width: 18, borderRadius: 3 },
+  val:     { fontSize: 10, fontWeight: '600', fontFamily: FF.semibold, lineHeight: 13 },
+  sub:     { fontSize: 8, fontWeight: '400', fontFamily: FF.regular, color: colors.textMuted, lineHeight: 11 },
+  badge:   { borderRadius: 4, paddingHorizontal: 4, paddingVertical: 1.5, marginTop: 2 },
+  badgeText: { fontSize: 8, fontWeight: '600', fontFamily: FF.semibold },
+  badgePlaceholder: { height: 16 },
+  timeLabel: { fontSize: 9, fontWeight: '500', fontFamily: FF.medium, color: colors.textMid, textAlign: 'center' },
 
-  tideNote:     { marginTop: 6, paddingTop: 6, borderTopWidth: 0.5, borderTopColor: colors.borderLight },
-  tideNoteText: { fontSize: 8, fontWeight: '300', color: colors.textFaint },
+  tideNote:     { marginTop: 10, paddingTop: 8, borderTopWidth: 0.5, borderTopColor: colors.borderLight },
+  tideNoteText: { fontSize: 9, fontWeight: '400', fontFamily: FF.regular, color: colors.textFaint },
 });

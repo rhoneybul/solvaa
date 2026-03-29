@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { View, Text, TouchableOpacity, StyleSheet, ScrollView, ActivityIndicator } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { colors } from '../theme';
+import { colors, fontFamily } from '../theme';
 import MapSketch from '../components/MapSketch';
 import { SheetHandle, SectionHeader, CampsiteCard } from '../components/UI';
 import api from '../services/api';
@@ -113,19 +113,20 @@ export default function CampsitesScreen({ navigation, route }) {
   );
 }
 
+const FF = fontFamily;
 const s = StyleSheet.create({
   container:  { flex: 1, backgroundColor: colors.bg },
   safe:       { flex: 1 },
-  nav:        { flexDirection: 'row', alignItems: 'center', paddingHorizontal: 12, paddingBottom: 8, paddingTop: 4, borderBottomWidth: 0.5, borderBottomColor: colors.border },
+  nav:        { flexDirection: 'row', alignItems: 'center', paddingHorizontal: 20, paddingBottom: 8, paddingTop: 4, borderBottomWidth: 0.5, borderBottomColor: colors.border },
   back:       { width: 36, height: 36, alignItems: 'center', justifyContent: 'center' },
-  backText:   { fontSize: 22, color: colors.good },
-  navTitle:   { flex: 1, fontSize: 15, fontWeight: '600', color: colors.text, marginLeft: 4 },
-  navRight:   { fontSize: 10.5, fontWeight: '300', color: colors.textMuted },
+  backText:   { fontSize: 24, color: colors.primary },
+  navTitle:   { flex: 1, fontSize: 17, fontWeight: '600', fontFamily: FF.semibold, color: colors.text, marginLeft: 4 },
+  navRight:   { fontSize: 12, fontWeight: '300', fontFamily: FF.light, color: colors.textMuted },
   sheet:      { flex: 1 },
-  center:     { flex: 1, alignItems: 'center', justifyContent: 'center', gap: 10, padding: 24 },
-  loadText:   { fontSize: 12, fontWeight: '300', color: colors.textMuted, textAlign: 'center' },
-  errorText:  { fontSize: 12, color: colors.warn, textAlign: 'center' },
-  retryBtn:   { backgroundColor: colors.text, borderRadius: 8, paddingHorizontal: 20, paddingVertical: 8 },
-  retryText:  { fontSize: 12, fontWeight: '500', color: colors.bg },
-  dataSource: { fontSize: 9.5, fontWeight: '300', color: colors.textFaint, textAlign: 'center', marginTop: 4, marginBottom: 8 },
+  center:     { flex: 1, alignItems: 'center', justifyContent: 'center', gap: 10, padding: 28 },
+  loadText:   { fontSize: 14, fontWeight: '300', fontFamily: FF.light, color: colors.textMuted, textAlign: 'center' },
+  errorText:  { fontSize: 14, color: colors.warn, textAlign: 'center' },
+  retryBtn:   { backgroundColor: colors.text, borderRadius: 12, paddingHorizontal: 24, paddingVertical: 10 },
+  retryText:  { fontSize: 14, fontWeight: '500', fontFamily: FF.medium, color: colors.bg },
+  dataSource: { fontSize: 11, fontWeight: '300', fontFamily: FF.light, color: colors.textFaint, textAlign: 'center', marginTop: 4, marginBottom: 8 },
 });

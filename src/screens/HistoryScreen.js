@@ -1,8 +1,9 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { View, Text, TouchableOpacity, StyleSheet, ScrollView, ActivityIndicator, RefreshControl } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { colors } from '../theme';
+import { colors, fontFamily } from '../theme';
 import { SectionHeader, PrimaryButton, ErrorState } from '../components/UI';
+import { HomeIcon } from '../components/Icons';
 import { getHistory } from '../services/storageService';
 
 const fmtDur = s => { const h = Math.floor(s/3600), m = Math.floor((s%3600)/60); return h > 0 ? `${h}h ${m}m` : `${m}m`; };
@@ -51,6 +52,9 @@ export default function HistoryScreen({ navigation }) {
         <View style={s.nav}>
           <TouchableOpacity onPress={() => navigation.goBack()} style={s.back}><Text style={s.backText}>‹</Text></TouchableOpacity>
           <Text style={s.navTitle}>Past Trips</Text>
+          <TouchableOpacity onPress={() => navigation.navigate('Home')} style={s.back}>
+            <HomeIcon size={20} color={colors.primary} />
+          </TouchableOpacity>
         </View>
 
         {loading ? (
@@ -121,30 +125,31 @@ export default function HistoryScreen({ navigation }) {
   );
 }
 
+const FF = fontFamily;
 const s = StyleSheet.create({
   container: { flex: 1, backgroundColor: colors.bg },
   safe: { flex: 1 },
-  nav: { flexDirection: 'row', alignItems: 'center', paddingHorizontal: 12, paddingBottom: 8, paddingTop: 4, borderBottomWidth: 0.5, borderBottomColor: colors.border },
+  nav: { flexDirection: 'row', alignItems: 'center', paddingHorizontal: 20, paddingBottom: 10, paddingTop: 6, borderBottomWidth: 0.5, borderBottomColor: colors.border },
   back: { width: 36, height: 36, alignItems: 'center', justifyContent: 'center' },
-  backText: { fontSize: 22, color: colors.good },
-  navTitle: { flex: 1, fontSize: 15, fontWeight: '600', color: colors.text, marginLeft: 4 },
+  backText: { fontSize: 22, color: colors.primary },
+  navTitle: { flex: 1, fontSize: 17, fontWeight: '600', fontFamily: FF.semibold, color: colors.text, marginLeft: 4 },
   center: { flex: 1, alignItems: 'center', justifyContent: 'center', paddingHorizontal: 32, gap: 8 },
-  emptyTitle: { fontSize: 15, fontWeight: '500', color: colors.text },
-  emptySub: { fontSize: 13, fontWeight: '300', color: colors.textMuted, textAlign: 'center' },
-  summary: { flexDirection: 'row', marginHorizontal: 12, marginTop: 8, marginBottom: 8, backgroundColor: colors.white, borderRadius: 9, overflow: 'hidden', borderWidth: 1, borderColor: colors.borderLight, shadowColor: '#000', shadowOffset: { width: 0, height: 0.5 }, shadowOpacity: 0.07, shadowRadius: 2, elevation: 1 },
+  emptyTitle: { fontSize: 17, fontWeight: '500', fontFamily: FF.medium, color: colors.text },
+  emptySub: { fontSize: 15, fontWeight: '300', fontFamily: FF.light, color: colors.textMuted, textAlign: 'center' },
+  summary: { flexDirection: 'row', marginHorizontal: 20, marginTop: 8, marginBottom: 8, backgroundColor: colors.white, borderRadius: 18, overflow: 'hidden', shadowColor: '#000', shadowOffset: { width: 0, height: 0.5 }, shadowOpacity: 0.06, shadowRadius: 12, elevation: 1 },
   summaryCell: { flex: 1, paddingVertical: 13, alignItems: 'center' },
   summaryCellBorder: { borderRightWidth: 0.5, borderRightColor: colors.borderLight },
-  summaryVal: { fontSize: 22, fontWeight: '300', color: colors.text, lineHeight: 24 },
-  summaryLabel: { fontSize: 8, fontWeight: '400', color: colors.textMuted, textTransform: 'uppercase', letterSpacing: 0.4, marginTop: 2 },
-  card: { marginHorizontal: 12, marginBottom: 8, backgroundColor: colors.white, borderRadius: 9, borderWidth: 1, borderColor: colors.borderLight, overflow: 'hidden', shadowColor: '#000', shadowOffset: { width: 0, height: 0.5 }, shadowOpacity: 0.07, shadowRadius: 2, elevation: 1 },
+  summaryVal: { fontSize: 26, fontWeight: '300', fontFamily: FF.light, color: colors.text, lineHeight: 28 },
+  summaryLabel: { fontSize: 10, fontWeight: '400', fontFamily: FF.regular, color: colors.textMuted, textTransform: 'uppercase', letterSpacing: 0.4, marginTop: 2 },
+  card: { marginHorizontal: 20, marginBottom: 8, backgroundColor: colors.white, borderRadius: 18, overflow: 'hidden', shadowColor: '#000', shadowOffset: { width: 0, height: 0.5 }, shadowOpacity: 0.06, shadowRadius: 12, elevation: 1 },
   sep: { height: 0.5, backgroundColor: colors.borderLight },
-  tripRow: { flexDirection: 'row', padding: 12, paddingVertical: 11, alignItems: 'flex-start' },
+  tripRow: { flexDirection: 'row', padding: 16, paddingVertical: 16, alignItems: 'flex-start' },
   tripLeft: { flex: 1 },
-  tripName: { fontSize: 13, fontWeight: '600', color: colors.text, marginBottom: 2 },
-  tripMeta: { fontSize: 10, fontWeight: '300', color: colors.textMuted, marginBottom: 4 },
+  tripName: { fontSize: 15, fontWeight: '600', fontFamily: FF.semibold, color: colors.text, marginBottom: 2 },
+  tripMeta: { fontSize: 12, fontWeight: '300', fontFamily: FF.light, color: colors.textMuted, marginBottom: 4 },
   tripTags: { flexDirection: 'row', gap: 8 },
-  tag: { fontSize: 10, fontWeight: '300', color: colors.textMid },
+  tag: { fontSize: 12, fontWeight: '300', fontFamily: FF.light, color: colors.textMid },
   tripRight: { alignItems: 'flex-end', paddingTop: 2 },
-  tripKm: { fontSize: 20, fontWeight: '400', color: colors.text, lineHeight: 22 },
-  tripKmLabel: { fontSize: 9, fontWeight: '300', color: colors.textMuted },
+  tripKm: { fontSize: 22, fontWeight: '400', fontFamily: FF.regular, color: colors.text, lineHeight: 24 },
+  tripKmLabel: { fontSize: 11, fontWeight: '300', fontFamily: FF.light, color: colors.textMuted },
 });

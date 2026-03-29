@@ -4,7 +4,7 @@ import {
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useFocusEffect } from '@react-navigation/native';
-import { colors } from '../theme';
+import { colors, fontFamily } from '../theme';
 import { getSavedSearches, deleteSavedSearch } from '../services/storageService';
 
 function formatSavedAt(ts) {
@@ -125,26 +125,27 @@ export default function SavedSearchesScreen({ navigation }) {
   );
 }
 
-const P = 12;
+const P = 20;
+const FF = fontFamily;
 const s = StyleSheet.create({
   container: { flex: 1, backgroundColor: colors.bg },
   safe:      { flex: 1 },
-  nav:       { flexDirection: 'row', alignItems: 'center', paddingHorizontal: P, paddingBottom: 8, paddingTop: 4, borderBottomWidth: 0.5, borderBottomColor: colors.border },
+  nav:       { flexDirection: 'row', alignItems: 'center', paddingHorizontal: 20, paddingBottom: 8, paddingTop: 4, borderBottomWidth: 0.5, borderBottomColor: colors.border },
   back:      { width: 36, height: 36, alignItems: 'center', justifyContent: 'center' },
-  backText:  { fontSize: 22, color: colors.primary },
-  navTitle:  { flex: 1, fontSize: 15, fontWeight: '600', color: colors.text, marginLeft: 4 },
+  backText:  { fontSize: 24, color: colors.primary },
+  navTitle:  { flex: 1, fontSize: 17, fontWeight: '600', fontFamily: FF.semibold, color: colors.text, marginLeft: 4 },
   scroll:    { flex: 1 },
   scrollContent: { paddingTop: 8, paddingBottom: 24 },
   empty:     { flex: 1, alignItems: 'center', justifyContent: 'center', paddingHorizontal: 40, gap: 10 },
-  emptyTitle:{ fontSize: 14, fontWeight: '500', color: colors.text, textAlign: 'center' },
-  emptyBody: { fontSize: 12, fontWeight: '300', color: colors.textMuted, textAlign: 'center', lineHeight: 18 },
-  card:      { marginHorizontal: P, marginBottom: 8, backgroundColor: colors.white, borderRadius: 10, borderWidth: 1, borderColor: colors.border, padding: 12, shadowColor: '#000', shadowOffset: { width: 0, height: 1 }, shadowOpacity: 0.06, shadowRadius: 3, elevation: 2 },
+  emptyTitle:{ fontSize: 17, fontWeight: '500', fontFamily: FF.medium, color: colors.text, textAlign: 'center' },
+  emptyBody: { fontSize: 15, fontWeight: '300', fontFamily: FF.light, color: colors.textMuted, textAlign: 'center', lineHeight: 22 },
+  card:      { marginHorizontal: 20, marginBottom: 8, backgroundColor: colors.white, borderRadius: 18, padding: 16, shadowColor: '#000', shadowOffset: { width: 0, height: 1 }, shadowOpacity: 0.06, shadowRadius: 12, elevation: 2 },
   cardMain:  { flexDirection: 'row', alignItems: 'flex-start', gap: 8 },
-  cardLocation: { fontSize: 13, fontWeight: '600', color: colors.text, marginBottom: 3 },
-  cardMeta:  { fontSize: 10, fontWeight: '300', color: colors.textMuted, marginBottom: 6 },
+  cardLocation: { fontSize: 15, fontWeight: '600', fontFamily: FF.semibold, color: colors.text, marginBottom: 3 },
+  cardMeta:  { fontSize: 12, fontWeight: '300', fontFamily: FF.light, color: colors.textMuted, marginBottom: 6 },
   routePreviewRow: { flexDirection: 'row', gap: 5, flexWrap: 'wrap' },
-  routePill: { backgroundColor: colors.bgDeep, borderRadius: 5, paddingHorizontal: 7, paddingVertical: 3 },
-  routePillText: { fontSize: 10, fontWeight: '400', color: colors.textMid },
+  routePill: { backgroundColor: colors.bgDeep, borderRadius: 8, paddingHorizontal: 10, paddingVertical: 4 },
+  routePillText: { fontSize: 12, fontWeight: '400', fontFamily: FF.regular, color: colors.textMid },
   deleteBtn: { paddingTop: 2 },
-  deleteBtnText: { fontSize: 18, fontWeight: '300', color: colors.textMuted, lineHeight: 20 },
+  deleteBtnText: { fontSize: 20, fontWeight: '300', fontFamily: FF.light, color: colors.textMuted, lineHeight: 22 },
 });

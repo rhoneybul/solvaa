@@ -2,7 +2,7 @@ import React, { useEffect, useState, useRef } from 'react';
 import { View, Text, ScrollView, TouchableOpacity, StyleSheet, ActivityIndicator, Animated } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import * as Location from 'expo-location';
-import { colors } from '../theme';
+import { colors, fontFamily } from '../theme';
 import { SheetHandle, MetricStrip, ConditionLayer, SectionHeader, AlertBanner, PrimaryButton } from '../components/UI';
 import { getWeatherWithCache } from '../services/weatherService';
 import Svg, { Path, Circle, Line, Rect } from 'react-native-svg';
@@ -154,50 +154,51 @@ export default function WeatherScreen({ navigation, route }) {
   );
 }
 
-const P = 16;
+const P = 20;
+const FF = fontFamily;
 const s = StyleSheet.create({
   container: { flex: 1, backgroundColor: colors.bg },
   safe: { flex: 1 },
   center: { alignItems: 'center', justifyContent: 'center', gap: 12 },
-  loadText: { fontSize: 13, fontWeight: '300', color: colors.textMuted },
-  errText: { fontSize: 13, color: colors.warn, textAlign: 'center', paddingHorizontal: 24 },
+  loadText: { fontSize: 15, fontWeight: '300', fontFamily: FF.light, color: colors.textMuted },
+  errText: { fontSize: 15, color: colors.warn, textAlign: 'center', paddingHorizontal: 24 },
   retryBtn: { backgroundColor: colors.text, borderRadius: 8, paddingHorizontal: 20, paddingVertical: 8 },
-  retryText: { fontSize: 13, fontWeight: '500', color: colors.bg },
+  retryText: { fontSize: 15, fontWeight: '500', fontFamily: FF.medium, color: colors.bg },
   nav: { flexDirection: 'row', alignItems: 'center', paddingHorizontal: P, paddingBottom: 8, paddingTop: 4, borderBottomWidth: 0.5, borderBottomColor: colors.border },
   back: { width: 36, height: 36, alignItems: 'center', justifyContent: 'center' },
-  backText: { fontSize: 22, color: colors.good },
-  navTitle: { flex: 1, fontSize: 15, fontWeight: '600', color: colors.text, marginLeft: 4 },
-  cached: { fontSize: 10.5, fontWeight: '300', color: colors.textMuted },
-  scoreCard: { marginHorizontal: P, marginTop: 12, marginBottom: 12, backgroundColor: colors.white, borderRadius: 9, padding: 16, flexDirection: 'row', alignItems: 'flex-start', justifyContent: 'space-between', borderWidth: 1, borderColor: colors.borderLight, shadowColor: '#000', shadowOffset: { width: 0, height: 0.5 }, shadowOpacity: 0.07, shadowRadius: 2, elevation: 1 },
-  scoreNum: { fontSize: 48, fontWeight: '300', lineHeight: 50 },
-  scoreLabel: { fontSize: 9, fontWeight: '400', color: colors.textMuted, textTransform: 'uppercase', letterSpacing: 0.5, marginTop: 2 },
+  backText: { fontSize: 22, color: colors.primary },
+  navTitle: { flex: 1, fontSize: 17, fontWeight: '600', fontFamily: FF.semibold, color: colors.text, marginLeft: 4 },
+  cached: { fontSize: 12.5, fontWeight: '300', fontFamily: FF.light, color: colors.textMuted },
+  scoreCard: { marginHorizontal: P, marginTop: 12, marginBottom: 12, backgroundColor: colors.white, borderRadius: 18, padding: 16, flexDirection: 'row', alignItems: 'flex-start', justifyContent: 'space-between', shadowColor: '#000', shadowOffset: { width: 0, height: 0.5 }, shadowOpacity: 0.06, shadowRadius: 12, elevation: 1 },
+  scoreNum: { fontSize: 52, fontWeight: '300', fontFamily: FF.light, lineHeight: 54 },
+  scoreLabel: { fontSize: 11, fontWeight: '400', fontFamily: FF.regular, color: colors.textMuted, textTransform: 'uppercase', letterSpacing: 0.5, marginTop: 2 },
   scoreRight: { alignItems: 'flex-end', paddingTop: 4, gap: 6 },
-  scoreBadge: { borderRadius: 5, paddingHorizontal: 9, paddingVertical: 3 },
-  scoreBadgeText: { fontSize: 11, fontWeight: '500' },
-  scoreCondition: { fontSize: 12, fontWeight: '300', color: colors.textMid },
-  scoreTemp: { fontSize: 11, fontWeight: '300', color: colors.textMuted },
-  condCard: { marginHorizontal: P, marginTop: 0, marginBottom: 12, backgroundColor: colors.white, borderRadius: 9, overflow: 'hidden', borderWidth: 1, borderColor: colors.borderLight, shadowColor: '#000', shadowOffset: { width: 0, height: 0.5 }, shadowOpacity: 0.07, shadowRadius: 2, elevation: 1 },
-  windowRow: { marginHorizontal: P, marginBottom: 12, backgroundColor: colors.white, borderRadius: 9, padding: 11, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', borderWidth: 1, borderColor: colors.borderLight },
-  windowText: { fontSize: 12, fontWeight: '400', color: colors.textMid },
-  windowTime: { fontSize: 12, fontWeight: '500' },
-  hourlyCard: { marginHorizontal: P, marginBottom: 12, backgroundColor: colors.white, borderRadius: 9, overflow: 'hidden', borderWidth: 1, borderColor: colors.borderLight },
-  hourlyTitle: { paddingHorizontal: P, paddingVertical: 8, fontSize: 11, fontWeight: '500', color: colors.text, borderBottomWidth: 0.5, borderBottomColor: colors.borderLight },
+  scoreBadge: { borderRadius: 8, paddingHorizontal: 12, paddingVertical: 4 },
+  scoreBadgeText: { fontSize: 13, fontWeight: '500', fontFamily: FF.medium },
+  scoreCondition: { fontSize: 14, fontWeight: '300', fontFamily: FF.light, color: colors.textMid },
+  scoreTemp: { fontSize: 13, fontWeight: '300', fontFamily: FF.light, color: colors.textMuted },
+  condCard: { marginHorizontal: P, marginTop: 0, marginBottom: 12, backgroundColor: colors.white, borderRadius: 18, overflow: 'hidden', shadowColor: '#000', shadowOffset: { width: 0, height: 0.5 }, shadowOpacity: 0.06, shadowRadius: 12, elevation: 1 },
+  windowRow: { marginHorizontal: P, marginBottom: 12, backgroundColor: colors.white, borderRadius: 18, padding: 14, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', shadowColor: '#000', shadowOffset: { width: 0, height: 0.5 }, shadowOpacity: 0.06, shadowRadius: 12, elevation: 1 },
+  windowText: { fontSize: 14, fontWeight: '400', fontFamily: FF.regular, color: colors.textMid },
+  windowTime: { fontSize: 14, fontWeight: '500', fontFamily: FF.medium },
+  hourlyCard: { marginHorizontal: P, marginBottom: 12, backgroundColor: colors.white, borderRadius: 18, overflow: 'hidden', shadowColor: '#000', shadowOffset: { width: 0, height: 0.5 }, shadowOpacity: 0.06, shadowRadius: 12, elevation: 1 },
+  hourlyTitle: { paddingHorizontal: P, paddingVertical: 10, fontSize: 13, fontWeight: '500', fontFamily: FF.medium, color: colors.text, borderBottomWidth: 0.5, borderBottomColor: colors.borderLight },
   hourlyRow: { flexDirection: 'row' },
   hourCell: { flex: 1, paddingVertical: 8, alignItems: 'center', gap: 2 },
   hourCellBorder: { borderRightWidth: 0.5, borderRightColor: colors.borderLight },
-  hourTime: { fontSize: 9, fontWeight: '300', color: colors.textMuted },
+  hourTime: { fontSize: 11, fontWeight: '300', fontFamily: FF.light, color: colors.textMuted },
   hourIcon: { fontSize: 14 },
-  hourWind: { fontSize: 13, fontWeight: '500' },
-  hourSub: { fontSize: 8, fontWeight: '300', color: colors.textMuted },
-  dayCard: { marginHorizontal: P, marginBottom: 12, backgroundColor: colors.white, borderRadius: 9, overflow: 'hidden', borderWidth: 1, borderColor: colors.borderLight },
-  dayRow: { flexDirection: 'row', alignItems: 'center', padding: 11, paddingVertical: 9 },
+  hourWind: { fontSize: 15, fontWeight: '500', fontFamily: FF.medium },
+  hourSub: { fontSize: 10, fontWeight: '300', fontFamily: FF.light, color: colors.textMuted },
+  dayCard: { marginHorizontal: P, marginBottom: 12, backgroundColor: colors.white, borderRadius: 18, overflow: 'hidden', shadowColor: '#000', shadowOffset: { width: 0, height: 0.5 }, shadowOpacity: 0.06, shadowRadius: 12, elevation: 1 },
+  dayRow: { flexDirection: 'row', alignItems: 'center', padding: 14 },
   dayRowBorder: { borderBottomWidth: 0.5, borderBottomColor: colors.borderLight },
-  dayName: { fontSize: 13, fontWeight: '600', color: colors.text, width: 68 },
+  dayName: { fontSize: 15, fontWeight: '600', fontFamily: FF.semibold, color: colors.text, width: 68 },
   dayIcon: { fontSize: 16, marginRight: 8 },
-  dayCondition: { flex: 1, fontSize: 12, fontWeight: '300', color: colors.textMid },
-  dayWind: { fontSize: 12, fontWeight: '300', color: colors.textMuted, marginRight: 8 },
-  dayTemp: { fontSize: 12, fontWeight: '500', color: colors.text },
+  dayCondition: { flex: 1, fontSize: 14, fontWeight: '300', fontFamily: FF.light, color: colors.textMid },
+  dayWind: { fontSize: 14, fontWeight: '300', fontFamily: FF.light, color: colors.textMuted, marginRight: 8 },
+  dayTemp: { fontSize: 14, fontWeight: '500', fontFamily: FF.medium, color: colors.text },
   ctaWrap: { marginTop: 4 },
   refreshBtn: { alignItems: 'center', paddingVertical: 8, marginBottom: 4 },
-  refreshText: { fontSize: 12, fontWeight: '300', color: colors.textMuted },
+  refreshText: { fontSize: 14, fontWeight: '300', fontFamily: FF.light, color: colors.textMuted },
 });

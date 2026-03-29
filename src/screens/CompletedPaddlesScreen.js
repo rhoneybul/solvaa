@@ -4,7 +4,8 @@ import {
   FlatList, RefreshControl, ActivityIndicator,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { colors } from '../theme';
+import { colors, fontFamily } from '../theme';
+import { HomeIcon } from '../components/Icons';
 import { getHistory } from '../services/storageService';
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
@@ -32,8 +33,8 @@ function monthKey(ts) {
 // ── Component ─────────────────────────────────────────────────────────────────
 
 export default function CompletedPaddlesScreen({ navigation }) {
-  const [paddles, setPaddles]     = useState([]);
-  const [loading, setLoading]     = useState(true);
+  const [paddles, setPaddles]       = useState([]);
+  const [loading, setLoading]       = useState(true);
   const [refreshing, setRefreshing] = useState(false);
 
   const load = useCallback(async () => {
@@ -46,6 +47,12 @@ export default function CompletedPaddlesScreen({ navigation }) {
   }, []);
 
   useEffect(() => { load(); }, [load]);
+
+  // Refresh list when returning from PaddleDetail (after a delete)
+  useEffect(() => {
+    const unsub = navigation.addListener('focus', () => load());
+    return unsub;
+  }, [navigation, load]);
 
   const onRefresh = useCallback(async () => {
     setRefreshing(true);
@@ -114,7 +121,11 @@ export default function CompletedPaddlesScreen({ navigation }) {
     const location = p.route?.location || p.route?.launchPoint || null;
 
     return (
-      <View style={s.paddleCard}>
+      <TouchableOpacity
+        style={s.paddleCard}
+        activeOpacity={0.85}
+        onPress={() => navigation.navigate('PaddleDetail', { paddle: p })}
+      >
         <View style={s.cardTop}>
           <View style={{ flex: 1 }}>
             <Text style={s.paddleName} numberOfLines={1}>{name}</Text>
@@ -153,7 +164,7 @@ export default function CompletedPaddlesScreen({ navigation }) {
             </View>
           )}
         </View>
-      </View>
+      </TouchableOpacity>
     );
   };
 
@@ -167,6 +178,9 @@ export default function CompletedPaddlesScreen({ navigation }) {
             <Text style={s.backText}>‹</Text>
           </TouchableOpacity>
           <Text style={s.navTitle}>Completed Paddles</Text>
+          <TouchableOpacity onPress={() => navigation.navigate('Home')} style={s.back}>
+            <HomeIcon size={20} color={colors.primary} />
+          </TouchableOpacity>
         </View>
 
         {loading ? (
@@ -205,54 +219,55 @@ export default function CompletedPaddlesScreen({ navigation }) {
 
 // ── Styles ─────────────────────────────────────────────────────────────────
 
-const P = 12;
+const P = 20;
+const FF = fontFamily;
 
 const s = StyleSheet.create({
   container: { flex: 1, backgroundColor: colors.bg },
   safe:      { flex: 1 },
   centered:  { flex: 1, alignItems: 'center', justifyContent: 'center', padding: 40, gap: 10 },
 
-  nav:      { flexDirection: 'row', alignItems: 'center', paddingHorizontal: P, paddingVertical: 8, borderBottomWidth: 0.5, borderBottomColor: colors.border },
+  nav:      { flexDirection: 'row', alignItems: 'center', paddingHorizontal: 20, paddingVertical: 8, borderBottomWidth: 0.5, borderBottomColor: colors.border },
   back:     { width: 36, height: 36, alignItems: 'center', justifyContent: 'center' },
   backText: { fontSize: 22, color: colors.primary },
-  navTitle: { flex: 1, fontSize: 15, fontWeight: '600', color: colors.text, marginLeft: 4 },
+  navTitle: { flex: 1, fontSize: 17, fontWeight: '600', fontFamily: FF.semibold, color: colors.text, marginLeft: 4 },
 
   list: { padding: P, gap: 0 },
 
   summary: {
     flexDirection: 'row', backgroundColor: colors.white,
-    borderRadius: 10, overflow: 'hidden',
-    borderWidth: 1, borderColor: colors.borderLight,
+    borderRadius: 18, overflow: 'hidden',
     marginBottom: 14,
+    shadowColor: '#000', shadowOffset: { width: 0, height: 1 }, shadowOpacity: 0.06, shadowRadius: 12, elevation: 2,
   },
   summaryCell:       { flex: 1, paddingVertical: 14, alignItems: 'center' },
   summaryCellBorder: { borderRightWidth: 0.5, borderRightColor: colors.borderLight },
-  summaryVal:        { fontSize: 16, fontWeight: '300', color: colors.text, lineHeight: 18 },
-  summaryLbl:        { fontSize: 7, fontWeight: '400', color: colors.textMuted, textTransform: 'uppercase', letterSpacing: 0.4, marginTop: 3 },
+  summaryVal:        { fontSize: 18, fontWeight: '300', fontFamily: FF.light, color: colors.text, lineHeight: 20 },
+  summaryLbl:        { fontSize: 9, fontWeight: '400', fontFamily: FF.regular, color: colors.textMuted, textTransform: 'uppercase', letterSpacing: 0.4, marginTop: 3 },
 
-  monthLabel: { fontSize: 9, fontWeight: '600', color: colors.textMuted, textTransform: 'uppercase', letterSpacing: 0.6, marginBottom: 6, marginTop: 4 },
+  monthLabel: { fontSize: 11, fontWeight: '600', fontFamily: FF.semibold, color: colors.textMuted, textTransform: 'uppercase', letterSpacing: 0.6, marginBottom: 6, marginTop: 4 },
 
   paddleCard: {
-    backgroundColor: colors.white, borderRadius: 10,
-    borderWidth: 1, borderColor: colors.borderLight,
-    marginBottom: 8, padding: 13, overflow: 'hidden',
+    backgroundColor: colors.white, borderRadius: 18,
+    marginBottom: 8, padding: 16, overflow: 'hidden',
+    shadowColor: '#000', shadowOffset: { width: 0, height: 1 }, shadowOpacity: 0.06, shadowRadius: 12, elevation: 2,
   },
   cardTop:      { flexDirection: 'row', marginBottom: 10 },
   cardRight:    { alignItems: 'flex-end', paddingTop: 2 },
-  paddleName:   { fontSize: 14, fontWeight: '600', color: colors.text, marginBottom: 2 },
-  paddleLocation: { fontSize: 10, fontWeight: '400', color: colors.textMuted, marginBottom: 1 },
-  paddleDate:   { fontSize: 10, fontWeight: '300', color: colors.textMuted },
-  distVal:      { fontSize: 24, fontWeight: '300', color: colors.text, lineHeight: 26 },
-  distLbl:      { fontSize: 9, fontWeight: '300', color: colors.textMuted },
+  paddleName:   { fontSize: 16, fontWeight: '600', fontFamily: FF.semibold, color: colors.text, marginBottom: 2 },
+  paddleLocation: { fontSize: 12, fontWeight: '400', fontFamily: FF.regular, color: colors.textMuted, marginBottom: 1 },
+  paddleDate:   { fontSize: 12, fontWeight: '300', fontFamily: FF.light, color: colors.textMuted },
+  distVal:      { fontSize: 26, fontWeight: '300', fontFamily: FF.light, color: colors.text, lineHeight: 28 },
+  distLbl:      { fontSize: 11, fontWeight: '300', fontFamily: FF.light, color: colors.textMuted },
 
-  statsRow:   { flexDirection: 'row', borderTopWidth: 0.5, borderTopColor: colors.borderLight, paddingTop: 10 },
+  statsRow:   { flexDirection: 'row', borderTopWidth: 0.5, borderTopColor: colors.borderLight, paddingTop: 12 },
   stat:       { flex: 1, alignItems: 'center' },
   statBorder: { borderLeftWidth: 0.5, borderLeftColor: colors.borderLight },
-  statLbl:    { fontSize: 7, fontWeight: '400', color: colors.textMuted, textTransform: 'uppercase', letterSpacing: 0.3, marginBottom: 3 },
-  statVal:    { fontSize: 13, fontWeight: '500', color: colors.text },
+  statLbl:    { fontSize: 9, fontWeight: '400', fontFamily: FF.regular, color: colors.textMuted, textTransform: 'uppercase', letterSpacing: 0.3, marginBottom: 3 },
+  statVal:    { fontSize: 15, fontWeight: '500', fontFamily: FF.medium, color: colors.text },
 
-  emptyTitle: { fontSize: 15, fontWeight: '600', color: colors.text },
-  emptySub:   { fontSize: 12, fontWeight: '300', color: colors.textMuted, textAlign: 'center', lineHeight: 18 },
-  trackBtn:   { backgroundColor: colors.primary, borderRadius: 10, paddingHorizontal: 24, paddingVertical: 12, marginTop: 4 },
-  trackBtnText: { fontSize: 14, fontWeight: '600', color: '#fff' },
+  emptyTitle: { fontSize: 17, fontWeight: '600', fontFamily: FF.semibold, color: colors.text },
+  emptySub:   { fontSize: 15, fontWeight: '300', fontFamily: FF.light, color: colors.textMuted, textAlign: 'center', lineHeight: 22 },
+  trackBtn:   { backgroundColor: colors.primary, borderRadius: 14, paddingHorizontal: 24, paddingVertical: 14, marginTop: 4 },
+  trackBtnText: { fontSize: 16, fontWeight: '600', fontFamily: FF.semibold, color: '#fff' },
 });

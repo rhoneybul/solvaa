@@ -1,9 +1,9 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
 import {
-  View, Text, TextInput, TouchableOpacity, StyleSheet, FlatList, Alert, ScrollView, RefreshControl, Platform, ActivityIndicator, Image, Animated, useWindowDimensions,
+  View, Text, TextInput, TouchableOpacity, StyleSheet, FlatList, Alert, ScrollView, RefreshControl, Platform, Linking, ActivityIndicator, Image, Animated, useWindowDimensions,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { colors } from '../theme';
+import { colors, fontFamily } from '../theme';
 import { getSavedRoutes, getSavedRoutesLocal, deleteSavedRoute, saveRoute, updateRouteWaypoints, updateRouteLocalKnowledge, updateRouteLkMessages } from '../services/storageService';
 import { getWeatherWithCache } from '../services/weatherService';
 import { fetchTides, buildTideHeightMap, buildTideExtremeMap } from '../services/tideService';
@@ -14,7 +14,7 @@ import PaddleMap from '../components/PaddleMap';
 import ConditionsTimeline from '../components/ConditionsTimeline';
 import { gpxRouteBearing } from '../components/PaddleMap';
 import { HeartIcon } from '../components/UI';
-import { HomeIcon, TrashIcon, PencilIcon } from '../components/Icons';
+import { BackIcon, HomeIcon, TrashIcon, PencilIcon, CompassIcon } from '../components/Icons';
 
 // ── Date helpers ──────────────────────────────────────────────────────────────
 
@@ -323,8 +323,8 @@ export default function SavedRoutesScreen({ navigation, route: navRoute }) {
         <SafeAreaView style={s.safe}>
           {/* Nav */}
           <View style={s.nav}>
-            <TouchableOpacity onPress={() => previewRoute ? navigation.goBack() : setSelected(null)} style={s.back}>
-              <Text style={s.backText}>‹</Text>
+            <TouchableOpacity onPress={() => previewRoute ? navigation.goBack() : setSelected(null)} style={s.navIconBtn}>
+              <BackIcon size={20} color={colors.primary} />
             </TouchableOpacity>
             {editingName && !isUnsaved ? (
               <TextInput
@@ -337,26 +337,24 @@ export default function SavedRoutesScreen({ navigation, route: navRoute }) {
                 onBlur={handleRename}
                 selectTextOnFocus
               />
-            ) : isUnsaved ? (
-              <Text style={[s.navTitle, { marginLeft: 4 }]} numberOfLines={1}>{selected.name}</Text>
             ) : (
-              <TouchableOpacity
-                style={s.navTitleBtn}
-                onPress={() => { setNameInput(selected.name); setEditingName(true); }}
-                activeOpacity={0.7}
-              >
-                <Text style={s.navTitle} numberOfLines={1}>{selected.name}</Text>
-                <PencilIcon size={14} color={colors.textMuted} />
-              </TouchableOpacity>
+              <Text style={s.navTitle} numberOfLines={1}>{selected.name}</Text>
             )}
-            {!isUnsaved && (
-              <TouchableOpacity onPress={() => handleDelete(selected.id)} style={s.deleteBtn}>
-                <TrashIcon size={22} color={colors.warn} />
+            <View style={s.navActions}>
+              {!isUnsaved && (
+                <TouchableOpacity onPress={() => { setNameInput(selected.name); setEditingName(true); }} style={s.navIconBtn}>
+                  <PencilIcon size={20} color={colors.textMuted} />
+                </TouchableOpacity>
+              )}
+              {!isUnsaved && (
+                <TouchableOpacity onPress={() => handleDelete(selected.id)} style={s.navIconBtn}>
+                  <TrashIcon size={20} color={colors.warn} />
+                </TouchableOpacity>
+              )}
+              <TouchableOpacity onPress={() => navigation.navigate('Home')} style={s.navIconBtn}>
+                <HomeIcon size={20} color={colors.primary} />
               </TouchableOpacity>
-            )}
-            <TouchableOpacity onPress={() => navigation.navigate('Home')} style={s.homeBtn}>
-              <HomeIcon size={22} color={colors.primary} />
-            </TouchableOpacity>
+            </View>
           </View>
 
           <Animated.View style={{ height: mapHeightAnim, overflow: 'hidden' }}>
@@ -494,10 +492,18 @@ export default function SavedRoutesScreen({ navigation, route: navRoute }) {
                 <Text style={s.sectionLabel}>{group.label.toUpperCase()}</Text>
                 <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={s.photoStrip}>
                   {group.photos.map((photo, i) => (
-                    <View key={i} style={s.photoCard}>
+                    <TouchableOpacity
+                      key={i}
+                      style={s.photoCard}
+                      activeOpacity={0.85}
+                      onPress={() => photo.commonsUrl && Linking.openURL(photo.commonsUrl)}
+                    >
                       <Image source={{ uri: photo.url }} style={s.photoImage} resizeMode="cover" />
                       <Text style={s.photoCaption} numberOfLines={2}>{photo.title}</Text>
-                    </View>
+                      {photo.commonsUrl && (
+                        <Text style={s.photoLink}>View on map →</Text>
+                      )}
+                    </TouchableOpacity>
                   ))}
                 </ScrollView>
               </View>
@@ -517,6 +523,15 @@ export default function SavedRoutesScreen({ navigation, route: navRoute }) {
                 }
               </TouchableOpacity>
             )}
+
+            {/* Start Paddle on Route */}
+            <TouchableOpacity
+              style={s.startRouteBtn}
+              onPress={() => navigation.navigate('ActivePaddle', { mode: 'route', savedRoute: selected })}
+              activeOpacity={0.85}
+            >
+              <Text style={s.startRouteBtnText}>▶  Start Paddle on Route</Text>
+            </TouchableOpacity>
 
             {/* GPX download badge */}
             {selected.gpxUrl && (
@@ -550,7 +565,10 @@ export default function SavedRoutesScreen({ navigation, route: navRoute }) {
                   onPress={() => setLkExpanded(e => !e)}
                   activeOpacity={0.7}
                 >
-                  <Text style={s.localKnowledgeTitle}>Local Knowledge</Text>
+                  <View style={s.lkHeaderLeft}>
+                    <CompassIcon size={15} color={colors.primary} strokeWidth={1.8} />
+                    <Text style={s.localKnowledgeTitle}>Local Knowledge</Text>
+                  </View>
                   <Text style={s.lkChevron}>{lkExpanded ? '▲' : '▼'}</Text>
                 </TouchableOpacity>
 
@@ -779,12 +797,12 @@ export default function SavedRoutesScreen({ navigation, route: navRoute }) {
     <View style={s.container}>
       <SafeAreaView style={s.safe}>
         <View style={s.nav}>
-          <TouchableOpacity onPress={() => navigation.goBack()} style={s.back}>
-            <Text style={s.backText}>‹</Text>
+          <TouchableOpacity onPress={() => navigation.goBack()} style={s.navIconBtn}>
+            <BackIcon size={20} color={colors.primary} />
           </TouchableOpacity>
           <Text style={s.navTitle}>Saved Paddles</Text>
-          <TouchableOpacity onPress={() => navigation.navigate('Home')} style={s.homeBtn}>
-            <HomeIcon size={22} color={colors.primary} />
+          <TouchableOpacity onPress={() => navigation.navigate('Home')} style={s.navIconBtn}>
+            <HomeIcon size={20} color={colors.primary} />
           </TouchableOpacity>
         </View>
 
@@ -826,8 +844,8 @@ export default function SavedRoutesScreen({ navigation, route: navRoute }) {
                     simpleRoute
                     staticView
                   />
-                  <View style={s.heartOverlay}>
-                    <HeartIcon filled size={20} color={colors.warn} />
+                  <View style={s.savedBadge}>
+                    <Text style={s.savedBadgeText}>Saved</Text>
                   </View>
                 </View>
                 {/* Route info */}
@@ -850,7 +868,6 @@ export default function SavedRoutesScreen({ navigation, route: navRoute }) {
                     {r.difficulty  ? <View style={s.metaChip}><Text style={s.metaChipText}>{r.difficulty}</Text></View> : null}
                   </View>
                 </View>
-                <Text style={s.chevron}>{'\u203A'}</Text>
               </TouchableOpacity>
             )}
           />
@@ -862,131 +879,134 @@ export default function SavedRoutesScreen({ navigation, route: navRoute }) {
 
 // ── Styles ────────────────────────────────────────────────────────────────────
 
-const P = 12;
+const P = 20;
+const FF = fontFamily;
 const s = StyleSheet.create({
   container: { flex: 1, backgroundColor: colors.bg },
   safe:      { flex: 1 },
   centered:  { flex: 1, alignItems: 'center', justifyContent: 'center', padding: 40 },
 
-  nav:           { flexDirection: 'row', alignItems: 'center', paddingHorizontal: P, paddingVertical: 8, borderBottomWidth: 0.5, borderBottomColor: colors.border },
-  back:          { width: 36, height: 36, alignItems: 'center', justifyContent: 'center' },
-  backText:      { fontSize: 22, color: colors.primary },
-  navTitle:      { flex: 1, fontSize: 13, fontWeight: '600', color: colors.text, marginLeft: 4 },
-  navTitleBtn:   { flex: 1, flexDirection: 'row', alignItems: 'center', gap: 5, marginLeft: 4 },
-  navTitleInput: { flex: 1, fontSize: 13, fontWeight: '600', color: colors.text, marginLeft: 4, paddingVertical: 2, paddingHorizontal: 4, borderBottomWidth: 1.5, borderBottomColor: colors.primary },
-  goBtn:         { marginHorizontal: 14, marginBottom: 10, backgroundColor: colors.primary, borderRadius: 12, paddingVertical: 14, alignItems: 'center' },
-  goBtnText:     { fontSize: 15, fontWeight: '600', color: '#fff' },
-  deleteBtn:     { paddingHorizontal: 8, alignItems: 'center', justifyContent: 'center' },
-  homeBtn:       { paddingHorizontal: 8, paddingVertical: 4, alignItems: 'center', justifyContent: 'center' },
+  nav:           { flexDirection: 'row', alignItems: 'center', paddingLeft: 6, paddingRight: 8, paddingVertical: 8, borderBottomWidth: 0.5, borderBottomColor: colors.border },
+  navIconBtn:    { width: 40, height: 40, alignItems: 'center', justifyContent: 'center' },
+  navTitle:      { flex: 1, fontSize: 15, fontWeight: '600', fontFamily: FF.semibold, color: colors.text, marginHorizontal: 4 },
+  navTitleBtn:   { flex: 1, flexDirection: 'row', alignItems: 'center', gap: 6, marginHorizontal: 4 },
+  navTitleInput: { flex: 1, fontSize: 14, fontWeight: '600', fontFamily: FF.semibold, color: colors.text, marginHorizontal: 4, paddingVertical: 2, paddingHorizontal: 4, borderBottomWidth: 1.5, borderBottomColor: colors.primary },
+  navActions:    { flexDirection: 'row', alignItems: 'center' },
+  goBtn:         { marginHorizontal: P, marginBottom: 10, backgroundColor: colors.primary, borderRadius: 16, paddingVertical: 16, alignItems: 'center', shadowColor: colors.primary, shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.2, shadowRadius: 10, elevation: 4 },
+  goBtnText:     { fontSize: 16, fontWeight: '600', fontFamily: FF.semibold, color: '#fff' },
+  startRouteBtn:     { marginHorizontal: P, marginBottom: 10, backgroundColor: colors.white, borderRadius: 16, paddingVertical: 14, alignItems: 'center', borderWidth: 1.5, borderColor: colors.primary },
+  startRouteBtnText: { fontSize: 15, fontWeight: '600', fontFamily: FF.semibold, color: colors.primary },
 
   // List
-  list:        { padding: P, gap: 10 },
-  routeCard:   { backgroundColor: colors.white, borderRadius: 14, overflow: 'hidden', borderWidth: 1, borderColor: colors.borderLight, shadowColor: '#000', shadowOffset: { width: 0, height: 1 }, shadowOpacity: 0.06, shadowRadius: 4, elevation: 2 },
+  list:        { padding: P, gap: 14 },
+  routeCard:   { backgroundColor: colors.white, borderRadius: 18, overflow: 'hidden', shadowColor: '#1a1d26', shadowOffset: { width: 0, height: 3 }, shadowOpacity: 0.07, shadowRadius: 14, elevation: 3 },
   mapThumb:    { overflow: 'hidden', position: 'relative' },
-  heartOverlay:{ position: 'absolute', top: 6, left: 6, backgroundColor: 'rgba(255,255,255,0.85)', borderRadius: 12, padding: 4 },
-  routeInfo:   { padding: P },
-  routeNameRow:  { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 2 },
-  routeName:     { fontSize: 14, fontWeight: '600', color: colors.text, flex: 1 },
+  savedBadge:    { position: 'absolute', top: 10, left: 10, backgroundColor: 'rgba(74,108,247,0.12)', borderRadius: 8, paddingHorizontal: 10, paddingVertical: 4 },
+  savedBadgeText:{ fontSize: 11, fontWeight: '600', fontFamily: FF.semibold, color: colors.primary },
+  routeInfo:   { padding: 16, paddingBottom: 14 },
+  routeNameRow:  { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 3 },
+  routeName:     { fontSize: 16, fontWeight: '600', fontFamily: FF.semibold, color: colors.text, flex: 1 },
   listDeleteBtn: { padding: 4, marginLeft: 8 },
-  routeLocation: { fontSize: 11, fontWeight: '400', color: colors.textMuted, marginBottom: 7 },
-  routeMeta:   { flexDirection: 'row', flexWrap: 'wrap', gap: 5 },
-  metaChip:    { backgroundColor: colors.bgDeep, borderRadius: 4, paddingHorizontal: 7, paddingVertical: 2 },
-  metaChipText:{ fontSize: 10, fontWeight: '400', color: colors.textMid },
-  chevron:     { position: 'absolute', right: 14, top: 120, fontSize: 20, fontWeight: '300', color: colors.textFaint },
+  routeLocation: { fontSize: 13, fontWeight: '400', fontFamily: FF.regular, color: colors.textMuted, marginBottom: 8 },
+  routeMeta:   { flexDirection: 'row', flexWrap: 'wrap', gap: 6 },
+  metaChip:    { backgroundColor: colors.primaryLight, borderRadius: 10, paddingHorizontal: 12, paddingVertical: 4 },
+  metaChipText:{ fontSize: 12, fontWeight: '500', fontFamily: FF.medium, color: colors.blue700 },
 
-  emptyTitle:  { fontSize: 16, fontWeight: '600', color: colors.text, marginBottom: 8 },
-  emptySub:    { fontSize: 13, fontWeight: '400', color: colors.textMuted, textAlign: 'center', lineHeight: 20, marginBottom: 24 },
-  planBtn:     { backgroundColor: colors.primary, borderRadius: 10, paddingHorizontal: 24, paddingVertical: 12 },
-  planBtnText: { fontSize: 14, fontWeight: '600', color: '#fff' },
+  emptyTitle:  { fontSize: 18, fontWeight: '600', fontFamily: FF.semibold, color: colors.text, marginBottom: 8 },
+  emptySub:    { fontSize: 15, fontWeight: '400', fontFamily: FF.regular, color: colors.textMuted, textAlign: 'center', lineHeight: 22, marginBottom: 24 },
+  planBtn:     { backgroundColor: colors.primary, borderRadius: 16, paddingHorizontal: 24, paddingVertical: 14, shadowColor: colors.primary, shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.2, shadowRadius: 10, elevation: 4 },
+  planBtnText: { fontSize: 16, fontWeight: '600', fontFamily: FF.semibold, color: '#fff' },
 
   // Detail view
-  metaStrip:      { flexDirection: 'row', marginHorizontal: P, marginVertical: 8, backgroundColor: colors.white, borderRadius: 9, overflow: 'hidden', borderWidth: 1, borderColor: colors.borderLight },
-  metaCell:       { flex: 1, paddingVertical: 9, alignItems: 'center' },
+  metaStrip:      { flexDirection: 'row', marginHorizontal: P, marginVertical: 8, backgroundColor: colors.white, borderRadius: 18, overflow: 'hidden', shadowColor: '#1a1d26', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.05, shadowRadius: 10, elevation: 2 },
+  metaCell:       { flex: 1, paddingVertical: 10, alignItems: 'center' },
   metaCellBorder: { borderRightWidth: 0.5, borderRightColor: colors.borderLight },
-  metaCellLabel:  { fontSize: 8, fontWeight: '400', color: colors.textMuted, textTransform: 'uppercase', letterSpacing: 0.4, marginBottom: 2 },
-  metaCellValue:  { fontSize: 11, fontWeight: '500', color: colors.text, textTransform: 'capitalize' },
+  metaCellLabel:  { fontSize: 10, fontWeight: '500', fontFamily: FF.medium, color: colors.textMuted, textTransform: 'uppercase', letterSpacing: 0.4, marginBottom: 2 },
+  metaCellValue:  { fontSize: 13, fontWeight: '500', fontFamily: FF.medium, color: colors.text, textTransform: 'capitalize' },
   metaCellRisk:   { color: colors.warn },
   metaCellSafe:   { color: colors.primary },
 
   gpxBadge:       { marginHorizontal: P, marginBottom: 6, flexDirection: 'row', alignItems: 'center' },
-  gpxBadgeText:   { fontSize: 10, fontWeight: '500', color: colors.primary },
+  gpxBadgeText:   { fontSize: 10, fontWeight: '500', fontFamily: FF.medium, color: colors.primary },
 
-  sectionLabel:   { fontSize: 9, fontWeight: '600', color: colors.textMuted, textTransform: 'uppercase', letterSpacing: 0.6, marginHorizontal: P, marginBottom: 6, marginTop: 4 },
+  sectionLabel:   { fontSize: 10, fontWeight: '600', fontFamily: FF.semibold, color: colors.textMuted, textTransform: 'uppercase', letterSpacing: 0.6, marginHorizontal: P, marginBottom: 6, marginTop: 4 },
 
   // Photo strip
   photoSection:   { marginTop: 6, marginBottom: 4 },
   photoLoading:   { height: 130, alignItems: 'center', justifyContent: 'center' },
   photoStrip:     { paddingHorizontal: P, gap: 8, paddingBottom: 4 },
-  photoCard:      { width: 160, borderRadius: 10, overflow: 'hidden', backgroundColor: colors.white, borderWidth: 1, borderColor: colors.borderLight },
+  photoCard:      { width: 160, borderRadius: 14, overflow: 'hidden', backgroundColor: colors.white },
   photoImage:     { width: 160, height: 110 },
-  photoCaption:   { fontSize: 9, fontWeight: '400', color: colors.textMuted, paddingHorizontal: 6, paddingVertical: 5, lineHeight: 13 },
+  photoCaption:   { fontSize: 9, fontWeight: '400', fontFamily: FF.regular, color: colors.textMuted, paddingHorizontal: 6, paddingTop: 5, lineHeight: 13 },
+  photoLink:      { fontSize: 8, fontWeight: '500', fontFamily: FF.medium, color: colors.primary, paddingHorizontal: 6, paddingBottom: 6, paddingTop: 2 },
 
   // Date strip
   dateStrip:      { flexDirection: 'row', gap: 6, paddingHorizontal: P, paddingBottom: 10 },
-  dateChip:       { alignItems: 'center', paddingVertical: 7, paddingHorizontal: 8, borderRadius: 10, backgroundColor: colors.white, borderWidth: 1, borderColor: colors.border, minWidth: 46 },
-  dateChipActive: { backgroundColor: colors.primary, borderColor: colors.primary },
-  dateDayName:    { fontSize: 9, fontWeight: '400', color: colors.textMuted, textTransform: 'uppercase', letterSpacing: 0.3, marginBottom: 2 },
-  dateDayNameActive: { color: 'rgba(255,255,255,0.75)' },
-  dateDayNum:     { fontSize: 15, fontWeight: '500', color: colors.text, lineHeight: 18 },
+  dateChip:       { alignItems: 'center', paddingVertical: 8, paddingHorizontal: 10, borderRadius: 14, backgroundColor: colors.white, minWidth: 48 },
+  dateChipActive: { backgroundColor: colors.primary, shadowColor: colors.primary, shadowOffset: { width: 0, height: 3 }, shadowOpacity: 0.25, shadowRadius: 8, elevation: 3 },
+  dateDayName:    { fontSize: 9, fontWeight: '500', fontFamily: FF.medium, color: colors.textMuted, textTransform: 'uppercase', letterSpacing: 0.3, marginBottom: 2 },
+  dateDayNameActive: { color: 'rgba(255,255,255,0.8)' },
+  dateDayNum:     { fontSize: 15, fontWeight: '600', fontFamily: FF.semibold, color: colors.text, lineHeight: 18 },
   dateDayNumActive:  { color: '#fff' },
   weatherDot:     { width: 5, height: 5, borderRadius: 3, marginTop: 4 },
-  weatherDotHas:  { backgroundColor: colors.primary },
+  weatherDotHas:  { backgroundColor: colors.accent },
   weatherDotActive: { backgroundColor: 'rgba(255,255,255,0.6)' },
   weatherDotNone: { backgroundColor: colors.borderLight },
 
-  loadingBox:  { marginHorizontal: P, padding: 16, backgroundColor: colors.white, borderRadius: 9, borderWidth: 1, borderColor: colors.borderLight, marginBottom: 8 },
-  loadingText: { fontSize: 11, fontWeight: '300', color: colors.textMuted, textAlign: 'center' },
-  descCard:    { marginHorizontal: P, marginBottom: 8, backgroundColor: colors.white, borderRadius: 9, borderWidth: 1, borderColor: colors.borderLight, padding: 12 },
-  descText:    { fontSize: 12, fontWeight: '300', color: colors.textMid, lineHeight: 18 },
+  loadingBox:  { marginHorizontal: P, padding: 16, backgroundColor: colors.white, borderRadius: 18, marginBottom: 8 },
+  loadingText: { fontSize: 13, fontWeight: '300', fontFamily: FF.light, color: colors.textMuted, textAlign: 'center' },
+  descCard:    { marginHorizontal: P, marginBottom: 8, backgroundColor: colors.white, borderRadius: 18, padding: 16 },
+  descText:    { fontSize: 14, fontWeight: '400', fontFamily: FF.regular, color: colors.textMid, lineHeight: 21 },
   chipsWrap:   { flexDirection: 'row', flexWrap: 'wrap', gap: 6, marginHorizontal: P, marginBottom: 8 },
-  chip:        { backgroundColor: colors.bgDeep, borderRadius: 4, paddingHorizontal: 8, paddingVertical: 3 },
-  chipText:    { fontSize: 10, fontWeight: '400', color: colors.textMid },
+  chip:        { backgroundColor: colors.primaryLight, borderRadius: 10, paddingHorizontal: 12, paddingVertical: 5 },
+  chipText:    { fontSize: 12, fontWeight: '500', fontFamily: FF.medium, color: colors.blue600 },
 
-  mapExpandBtn:       { paddingHorizontal: 10, paddingVertical: 5, borderRadius: 8, borderWidth: 1, borderColor: colors.border, backgroundColor: colors.white },
-  mapExpandBtnText:   { fontSize: 11, fontWeight: '500', color: colors.primary },
-  drawBar:            { flexDirection: 'row', alignItems: 'center', paddingHorizontal: 10, paddingVertical: 7, gap: 6, borderBottomWidth: 0.5, borderBottomColor: colors.border, backgroundColor: colors.white },
-  drawToggle:         { paddingHorizontal: 10, paddingVertical: 5, borderRadius: 8, borderWidth: 1, borderColor: colors.primary },
+  mapExpandBtn:       { paddingHorizontal: 10, paddingVertical: 5, borderRadius: 10, borderWidth: 1, borderColor: colors.border, backgroundColor: colors.white },
+  mapExpandBtnText:   { fontSize: 11, fontWeight: '500', fontFamily: FF.medium, color: colors.primary },
+  drawBar:            { flexDirection: 'row', alignItems: 'center', paddingHorizontal: 12, paddingVertical: 8, gap: 6, borderBottomWidth: 0.5, borderBottomColor: colors.border, backgroundColor: colors.white },
+  drawToggle:         { paddingHorizontal: 12, paddingVertical: 6, borderRadius: 10, borderWidth: 1.5, borderColor: colors.primary },
   drawToggleActive:   { backgroundColor: colors.primary },
-  drawToggleText:     { fontSize: 11, fontWeight: '500', color: colors.primary },
+  drawToggleText:     { fontSize: 11, fontWeight: '500', fontFamily: FF.medium, color: colors.primary },
   drawToggleTextActive:{ color: '#fff' },
   drawStatsOverlay:   { position: 'absolute', top: 10, left: 0, right: 0, alignItems: 'center' },
-  drawStatsText:      { backgroundColor: 'rgba(0,0,0,0.45)', color: '#fff', fontSize: 12, fontWeight: '600', paddingHorizontal: 14, paddingVertical: 5, borderRadius: 20, overflow: 'hidden', letterSpacing: 0.2 },
+  drawStatsText:      { backgroundColor: 'rgba(26,29,38,0.55)', color: '#fff', fontSize: 12, fontWeight: '600', fontFamily: FF.semibold, paddingHorizontal: 14, paddingVertical: 6, borderRadius: 20, overflow: 'hidden', letterSpacing: 0.2 },
   drawStat:           { alignItems: 'center', paddingHorizontal: 4 },
-  drawStatVal:        { fontSize: 12, fontWeight: '600', color: colors.text },
-  drawStatLabel:      { fontSize: 9, fontWeight: '400', color: colors.textMuted },
-  drawAction:         { paddingHorizontal: 8, paddingVertical: 5, borderRadius: 8, borderWidth: 1, borderColor: colors.border },
-  drawActionText:     { fontSize: 11, fontWeight: '400', color: colors.textMid },
-  drawClear:          { paddingHorizontal: 8, paddingVertical: 5, borderRadius: 8, borderWidth: 1, borderColor: colors.warn + '88' },
-  drawClearText:      { fontSize: 11, fontWeight: '400', color: colors.warn },
-  drawFinish:         { paddingHorizontal: 14, paddingVertical: 5, borderRadius: 8, backgroundColor: colors.primary },
-  drawFinishText:     { fontSize: 11, fontWeight: '600', color: '#fff' },
+  drawStatVal:        { fontSize: 12, fontWeight: '600', fontFamily: FF.semibold, color: colors.text },
+  drawStatLabel:      { fontSize: 9, fontWeight: '400', fontFamily: FF.regular, color: colors.textMuted },
+  drawAction:         { paddingHorizontal: 10, paddingVertical: 6, borderRadius: 10, borderWidth: 1, borderColor: colors.border },
+  drawActionText:     { fontSize: 11, fontWeight: '500', fontFamily: FF.medium, color: colors.textMid },
+  drawClear:          { paddingHorizontal: 10, paddingVertical: 6, borderRadius: 10, borderWidth: 1, borderColor: colors.warn + '88' },
+  drawClearText:      { fontSize: 11, fontWeight: '500', fontFamily: FF.medium, color: colors.warn },
+  drawFinish:         { paddingHorizontal: 16, paddingVertical: 6, borderRadius: 10, backgroundColor: colors.primary, shadowColor: colors.primary, shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.2, shadowRadius: 6, elevation: 2 },
+  drawFinishText:     { fontSize: 11, fontWeight: '600', fontFamily: FF.semibold, color: '#fff' },
 
-  localKnowledgeBtn:     { marginHorizontal: P, marginTop: 4, marginBottom: 8, borderWidth: 1, borderColor: colors.primary, borderRadius: 10, paddingVertical: 11, alignItems: 'center' },
-  localKnowledgeBtnText: { fontSize: 13, fontWeight: '500', color: colors.primary },
-  lkLoadingCard:         { marginHorizontal: P, marginTop: 4, marginBottom: 8, backgroundColor: colors.white, borderRadius: 10, borderWidth: 1, borderColor: colors.borderLight, padding: 16, alignItems: 'center', gap: 8 },
-  lkLoadingTitle:        { fontSize: 13, fontWeight: '500', color: colors.text, marginTop: 4 },
-  lkLoadingSubtitle:     { fontSize: 12, fontWeight: '300', color: colors.textMuted, textAlign: 'center', lineHeight: 17 },
-  localKnowledgeCard:    { marginHorizontal: P, marginBottom: 8, backgroundColor: colors.white, borderRadius: 10, borderWidth: 1, borderColor: colors.borderLight, padding: 14 },
+  localKnowledgeBtn:     { marginHorizontal: P, marginTop: 4, marginBottom: 8, borderWidth: 1.5, borderColor: colors.primary, borderRadius: 14, paddingVertical: 12, alignItems: 'center' },
+  localKnowledgeBtnText: { fontSize: 12, fontWeight: '500', fontFamily: FF.medium, color: colors.primary },
+  lkLoadingCard:         { marginHorizontal: P, marginTop: 4, marginBottom: 8, backgroundColor: colors.white, borderRadius: 14, borderWidth: 1, borderColor: colors.borderLight, padding: 18, alignItems: 'center', gap: 8 },
+  lkLoadingTitle:        { fontSize: 12, fontWeight: '500', fontFamily: FF.medium, color: colors.text, marginTop: 4 },
+  lkLoadingSubtitle:     { fontSize: 11, fontWeight: '300', fontFamily: FF.light, color: colors.textMuted, textAlign: 'center', lineHeight: 17 },
+  localKnowledgeCard:    { marginHorizontal: P, marginBottom: 8, backgroundColor: colors.white, borderRadius: 18, padding: 18 },
   lkHeader:              { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
-  localKnowledgeTitle:   { fontSize: 13, fontWeight: '600', color: colors.text },
-  lkChevron:             { fontSize: 10, color: colors.textMuted },
-  localKnowledgeSummary: { fontSize: 12, fontWeight: '300', color: colors.textMid, lineHeight: 18, marginTop: 8, marginBottom: 10 },
+  lkHeaderLeft:          { flexDirection: 'row', alignItems: 'center', gap: 7 },
+  localKnowledgeTitle:   { fontSize: 12, fontWeight: '600', fontFamily: FF.semibold, color: colors.text },
+  lkChevron:             { fontSize: 9, color: colors.textMuted },
+  localKnowledgeSummary: { fontSize: 12, fontWeight: '400', fontFamily: FF.regular, color: colors.textMid, lineHeight: 19, marginTop: 8, marginBottom: 10 },
   lkSection:             { marginBottom: 10, paddingTop: 9, borderTopWidth: 0.5, borderTopColor: colors.borderLight },
-  lkSectionTitle:        { fontSize: 9, fontWeight: '600', color: colors.textMuted, textTransform: 'uppercase', letterSpacing: 0.5, marginBottom: 5 },
-  lkText:                { fontSize: 11, fontWeight: '300', color: colors.textMid, lineHeight: 16, marginBottom: 3 },
+  lkSectionTitle:        { fontSize: 8.5, fontWeight: '600', fontFamily: FF.semibold, color: colors.textMuted, textTransform: 'uppercase', letterSpacing: 0.5, marginBottom: 4 },
+  lkText:                { fontSize: 11, fontWeight: '400', fontFamily: FF.regular, color: colors.textMid, lineHeight: 17, marginBottom: 3 },
   lkCaution:             { color: colors.warn + 'cc' },
   lkRefreshBtn:          { marginTop: 10, alignItems: 'center', paddingVertical: 6 },
-  lkRefreshText:         { fontSize: 11, fontWeight: '500', color: colors.textMuted },
+  lkRefreshText:         { fontSize: 11, fontWeight: '500', fontFamily: FF.medium, color: colors.textMuted },
   lkQA:                  { marginTop: 12, borderTopWidth: 0.5, borderTopColor: colors.borderLight, paddingTop: 10 },
   lkMessages:            { gap: 6, marginBottom: 8 },
-  lkMsg:                 { borderRadius: 8, paddingHorizontal: 10, paddingVertical: 7, maxWidth: '90%' },
-  lkMsgUser:             { alignSelf: 'flex-end', backgroundColor: colors.primary },
-  lkMsgAssistant:        { alignSelf: 'flex-start', backgroundColor: colors.bgDeep },
-  lkMsgUserText:         { fontSize: 12, fontWeight: '400', color: '#fff', lineHeight: 17 },
-  lkMsgAssistantText:    { fontSize: 12, fontWeight: '300', color: colors.text, lineHeight: 17 },
+  lkMsg:                 { borderRadius: 14, paddingHorizontal: 12, paddingVertical: 8, maxWidth: '90%' },
+  lkMsgUser:             { alignSelf: 'flex-end', backgroundColor: colors.primary, shadowColor: colors.primary, shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.15, shadowRadius: 6, elevation: 2 },
+  lkMsgAssistant:        { alignSelf: 'flex-start', backgroundColor: colors.primaryLight },
+  lkMsgUserText:         { fontSize: 12, fontWeight: '400', fontFamily: FF.regular, color: '#fff', lineHeight: 17 },
+  lkMsgAssistantText:    { fontSize: 12, fontWeight: '400', fontFamily: FF.regular, color: colors.text, lineHeight: 17 },
   lkInputRow:            { flexDirection: 'row', alignItems: 'center', gap: 6 },
-  lkInput:               { flex: 1, borderWidth: 1, borderColor: colors.border, borderRadius: 8, paddingHorizontal: 10, paddingVertical: 7, fontSize: 12, fontWeight: '300', color: colors.text, backgroundColor: colors.white },
-  lkSendBtn:             { width: 32, height: 32, borderRadius: 8, backgroundColor: colors.primary, alignItems: 'center', justifyContent: 'center' },
+  lkInput:               { flex: 1, borderWidth: 1, borderColor: colors.border, borderRadius: 12, paddingHorizontal: 12, paddingVertical: 8, fontSize: 12, fontWeight: '400', fontFamily: FF.regular, color: colors.text, backgroundColor: colors.white },
+  lkSendBtn:             { width: 34, height: 34, borderRadius: 10, backgroundColor: colors.primary, alignItems: 'center', justifyContent: 'center', shadowColor: colors.primary, shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.2, shadowRadius: 4, elevation: 2 },
   lkSendBtnDisabled:     { backgroundColor: colors.textFaint },
   lkSendText:            { fontSize: 16, color: '#fff', lineHeight: 18 },
 

@@ -1,8 +1,8 @@
 import React, { useEffect, useState, useCallback } from 'react';
-import { HomeIcon } from '../components/Icons';
+import { BackIcon, HomeIcon } from '../components/Icons';
 import { View, Text, TouchableOpacity, StyleSheet, ScrollView, ActivityIndicator, RefreshControl, Alert } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { colors } from '../theme';
+import { colors, fontFamily } from '../theme';
 import MapSketch from '../components/MapSketch';
 import {
   SheetHandle, SectionHeader, AlertBanner, PrimaryButton, MetricStrip,
@@ -153,12 +153,12 @@ export default function RoutesScreen({ navigation, route }) {
     <View style={s.container}>
       <SafeAreaView style={s.safe}>
         <View style={s.nav}>
-          <TouchableOpacity onPress={() => navigation.goBack()} style={s.back}>
-            <Text style={s.backText}>{'\u2039'}</Text>
+          <TouchableOpacity onPress={() => navigation.goBack()} style={s.navIconBtn}>
+            <BackIcon size={20} color={colors.primary} />
           </TouchableOpacity>
           <Text style={s.navTitle}>Routes</Text>
-          <TouchableOpacity onPress={() => navigation.navigate('Home')} style={s.homeBtn}>
-            <HomeIcon size={22} color={colors.good} />
+          <TouchableOpacity onPress={() => navigation.navigate('Home')} style={s.navIconBtn}>
+            <HomeIcon size={20} color={colors.primary} />
           </TouchableOpacity>
         </View>
 
@@ -342,43 +342,42 @@ export default function RoutesScreen({ navigation, route }) {
   );
 }
 
+const FF = fontFamily;
 const s = StyleSheet.create({
   container: { flex: 1, backgroundColor: colors.bg },
   safe: { flex: 1 },
-  nav: { flexDirection: 'row', alignItems: 'center', paddingHorizontal: 12, paddingBottom: 8, paddingTop: 4, borderBottomWidth: 0.5, borderBottomColor: colors.border },
-  back: { width: 36, height: 36, alignItems: 'center', justifyContent: 'center' },
-  backText: { fontSize: 22, color: colors.good },
-  navTitle: { flex: 1, fontSize: 13, fontWeight: '600', color: colors.text, marginLeft: 4 },
-  navRight: { fontSize: 10.5, fontWeight: '300', color: colors.textMuted },
-  homeBtn:     { paddingHorizontal: 8, paddingVertical: 4, alignItems: 'center', justifyContent: 'center' },
+  nav: { flexDirection: 'row', alignItems: 'center', paddingLeft: 6, paddingRight: 8, paddingBottom: 8, paddingTop: 4, borderBottomWidth: 0.5, borderBottomColor: colors.border },
+  navIconBtn: { width: 40, height: 40, alignItems: 'center', justifyContent: 'center' },
+  navTitle: { flex: 1, fontSize: 15, fontWeight: '600', fontFamily: FF.semibold, color: colors.text, marginHorizontal: 4 },
+  navRight: { fontSize: 12.5, fontWeight: '300', fontFamily: FF.light, color: colors.textMuted },
   sheet: { flex: 1 },
   // Conditions
-  conditionsCard: { marginHorizontal: 12, marginBottom: 8, backgroundColor: colors.white, borderRadius: 9, borderWidth: 1, borderColor: colors.borderLight, overflow: 'hidden' },
+  conditionsCard: { marginHorizontal: 20, marginBottom: 8, backgroundColor: colors.white, borderRadius: 18, overflow: 'hidden', shadowColor: '#000', shadowOffset: { width: 0, height: 0.5 }, shadowOpacity: 0.06, shadowRadius: 12, elevation: 1 },
   weatherLoadingWrap: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8, paddingVertical: 12 },
-  weatherLoadingText: { fontSize: 11, fontWeight: '300', color: colors.textMuted },
-  retryBtn: { alignSelf: 'center', paddingHorizontal: 16, paddingVertical: 6, borderRadius: 6, borderWidth: 1, borderColor: colors.border, marginBottom: 8 },
-  retryText: { fontSize: 11, fontWeight: '500', color: colors.blue },
+  weatherLoadingText: { fontSize: 13, fontWeight: '300', fontFamily: FF.light, color: colors.textMuted },
+  retryBtn: { alignSelf: 'center', paddingHorizontal: 16, paddingVertical: 6, borderRadius: 10, borderWidth: 1, borderColor: colors.border, marginBottom: 8 },
+  retryText: { fontSize: 13, fontWeight: '500', fontFamily: FF.medium, color: colors.blue },
   // Route cards
-  routeCard: { marginHorizontal: 12, marginBottom: 8, backgroundColor: colors.white, borderRadius: 9, borderWidth: 1, borderColor: colors.borderLight, overflow: 'hidden', shadowColor: '#000', shadowOffset: { width: 0, height: 0.5 }, shadowOpacity: 0.07, shadowRadius: 2, elevation: 1 },
-  routeCardSel: { borderWidth: 1.5, borderColor: colors.text },
-  routeHeader: { flexDirection: 'row', alignItems: 'center', padding: 11, gap: 8, borderBottomWidth: 0.5, borderBottomColor: '#f0ede8' },
-  rankBadge: { width: 19, height: 19, borderRadius: 10, alignItems: 'center', justifyContent: 'center', flexShrink: 0 },
-  rankText: { fontSize: 9, fontWeight: '600' },
-  routeName: { flex: 1, fontSize: 13, fontWeight: '600', color: colors.text },
-  diffBadge: { borderRadius: 4, paddingHorizontal: 6, paddingVertical: 2 },
-  diffText: { fontSize: 9.5, fontWeight: '500' },
+  routeCard: { marginHorizontal: 20, marginBottom: 8, backgroundColor: colors.white, borderRadius: 18, overflow: 'hidden', shadowColor: '#000', shadowOffset: { width: 0, height: 0.5 }, shadowOpacity: 0.06, shadowRadius: 12, elevation: 1 },
+  routeCardSel: { borderWidth: 2, borderColor: colors.primary },
+  routeHeader: { flexDirection: 'row', alignItems: 'center', padding: 16, gap: 8, borderBottomWidth: 0.5, borderBottomColor: '#f0ede8' },
+  rankBadge: { width: 24, height: 24, borderRadius: 12, alignItems: 'center', justifyContent: 'center', flexShrink: 0 },
+  rankText: { fontSize: 11, fontWeight: '600', fontFamily: FF.semibold },
+  routeName: { flex: 1, fontSize: 15, fontWeight: '600', fontFamily: FF.semibold, color: colors.text },
+  diffBadge: { borderRadius: 8, paddingHorizontal: 8, paddingVertical: 3 },
+  diffText: { fontSize: 11, fontWeight: '500', fontFamily: FF.medium },
   routeMapWrap: { borderBottomWidth: 0.5, borderBottomColor: '#f0ede8' },
-  routeStats: { flexDirection: 'row', borderBottomWidth: 0.5, borderBottomColor: '#f0ede8' },
-  routeStat: { flex: 1, padding: 9, borderRightWidth: 0.5, borderRightColor: '#f0ede8' },
-  routeStatL: { fontSize: 7.5, color: colors.textMuted, textTransform: 'uppercase', letterSpacing: 0.3, marginBottom: 1 },
-  routeStatV: { fontSize: 14, fontWeight: '500', color: colors.text },
-  routeDetail: { padding: 11 },
-  routeWhy: { fontSize: 11.5, color: colors.textMid, lineHeight: 18, fontWeight: '300', marginBottom: 4 },
-  routeTip: { fontSize: 10.5, color: colors.caution, fontWeight: '300', lineHeight: 16, marginTop: 4 },
+  routeStats: { flexDirection: 'row', borderBottomWidth: 0.5, borderBottomColor: colors.borderLight },
+  routeStat: { flex: 1, padding: 12, borderRightWidth: 0.5, borderRightColor: colors.borderLight },
+  routeStatL: { fontSize: 9, color: colors.textMuted, textTransform: 'uppercase', letterSpacing: 0.3, marginBottom: 1 },
+  routeStatV: { fontSize: 16, fontWeight: '500', fontFamily: FF.medium, color: colors.text },
+  routeDetail: { padding: 16 },
+  routeWhy: { fontSize: 13, color: colors.textMid, lineHeight: 20, fontWeight: '300', fontFamily: FF.light, marginBottom: 4 },
+  routeTip: { fontSize: 12, color: colors.caution, fontWeight: '300', fontFamily: FF.light, lineHeight: 18, marginTop: 4 },
   safetyBriefing: { marginTop: 4, marginBottom: 4 },
-  safetyNote: { fontSize: 10, color: colors.warn, fontWeight: '300', lineHeight: 16, marginBottom: 2 },
+  safetyNote: { fontSize: 12, color: colors.warn, fontWeight: '300', fontFamily: FF.light, lineHeight: 18, marginBottom: 2 },
   weatherWindowChip: { marginTop: 6, borderRadius: 5, borderWidth: 1, padding: 5, paddingHorizontal: 8, alignSelf: 'flex-start' },
-  weatherWindowText: { fontSize: 10, fontWeight: '500' },
-  campsiteLink: { marginHorizontal: 12, marginBottom: 8, backgroundColor: colors.white, borderRadius: 9, padding: 12, borderWidth: 1, borderColor: colors.borderLight },
-  campsiteLinkText: { fontSize: 13, fontWeight: '400', color: colors.blue },
+  weatherWindowText: { fontSize: 12, fontWeight: '500', fontFamily: FF.medium },
+  campsiteLink: { marginHorizontal: 20, marginBottom: 8, backgroundColor: colors.white, borderRadius: 18, padding: 16, shadowColor: '#000', shadowOffset: { width: 0, height: 0.5 }, shadowOpacity: 0.06, shadowRadius: 12, elevation: 1 },
+  campsiteLinkText: { fontSize: 15, fontWeight: '400', fontFamily: FF.regular, color: colors.blue },
 });

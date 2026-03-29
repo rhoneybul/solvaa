@@ -105,4 +105,18 @@ router.get('/:id', async (req, res, next) => {
   } catch (err) { next(err); }
 });
 
+// DELETE /api/paddles/:id
+router.delete('/:id', async (req, res, next) => {
+  try {
+    const { error } = await supabase
+      .from('paddles')
+      .delete()
+      .eq('id', req.params.id)
+      .eq('user_id', req.user.id);
+
+    if (error) throw error;
+    res.status(204).end();
+  } catch (err) { next(err); }
+});
+
 module.exports = router;

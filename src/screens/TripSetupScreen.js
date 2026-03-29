@@ -4,7 +4,7 @@ import {
   ScrollView, ActivityIndicator, Platform,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { colors } from '../theme';
+import { colors, fontFamily } from '../theme';
 import { SectionHeader, PrimaryButton, AlertBanner, GhostButton } from '../components/UI';
 import {
   SKILL_LEVELS, EFFORT_LEVELS,
@@ -501,68 +501,69 @@ export default function TripSetupScreen({ navigation }) {
 }
 
 // ── Styles ────────────────────────────────────────────────────────────────────
+const FF = fontFamily;
 const s = StyleSheet.create({
   container: { flex: 1, backgroundColor: colors.bg },
   safe:      { flex: 1 },
-  nav:       { flexDirection: 'row', alignItems: 'center', paddingHorizontal: 12, paddingBottom: 8, paddingTop: 4, borderBottomWidth: 0.5, borderBottomColor: colors.border },
+  nav:       { flexDirection: 'row', alignItems: 'center', paddingHorizontal: 20, paddingBottom: 8, paddingTop: 4, borderBottomWidth: 0.5, borderBottomColor: colors.border },
   back:      { width: 36, height: 36, alignItems: 'center', justifyContent: 'center' },
-  backText:  { fontSize: 22, color: colors.good },
-  navTitle:  { flex: 1, fontSize: 15, fontWeight: '600', color: colors.text, marginLeft: 4 },
+  backText:  { fontSize: 24, color: colors.primary },
+  navTitle:  { flex: 1, fontSize: 17, fontWeight: '600', fontFamily: FF.semibold, color: colors.text, marginLeft: 4 },
 
   // Cards
-  card: { marginHorizontal: 12, marginBottom: 8, backgroundColor: colors.white, borderRadius: 9, borderWidth: 1, borderColor: colors.borderLight, overflow: 'hidden', shadowColor: '#000', shadowOffset: { width: 0, height: 0.5 }, shadowOpacity: 0.07, shadowRadius: 2, elevation: 1 },
-  row:  { flexDirection: 'row', alignItems: 'center', padding: 12, paddingVertical: 11, gap: 10 },
+  card: { marginHorizontal: 20, marginBottom: 8, backgroundColor: colors.white, borderRadius: 18, overflow: 'hidden', shadowColor: '#000', shadowOffset: { width: 0, height: 0.5 }, shadowOpacity: 0.06, shadowRadius: 12, elevation: 1 },
+  row:  { flexDirection: 'row', alignItems: 'center', padding: 16, paddingVertical: 14, gap: 12 },
   rowMain:          { flex: 1 },
-  rowLabel:         { fontSize: 13, fontWeight: '400', color: colors.text, marginBottom: 1 },
-  rowLabelSelected: { fontWeight: '600' },
-  rowSub:           { fontSize: 11, fontWeight: '300', color: colors.textMuted },
+  rowLabel:         { fontSize: 15, fontWeight: '400', fontFamily: FF.regular, color: colors.text, marginBottom: 1 },
+  rowLabelSelected: { fontWeight: '600', fontFamily: FF.semibold },
+  rowSub:           { fontSize: 13, fontWeight: '300', fontFamily: FF.light, color: colors.textMuted },
   sep:              { height: 0.5, backgroundColor: colors.borderLight },
-  check:            { fontSize: 14, fontWeight: '600', color: colors.blue },
+  check:            { fontSize: 16, fontWeight: '600', fontFamily: FF.semibold, color: colors.primary },
 
   // Segmented control (Manual / Strava toggle)
-  segmentedControl: { flexDirection: 'row', marginHorizontal: 12, marginBottom: 8, backgroundColor: '#e1e0db', borderRadius: 8, padding: 2, gap: 2 },
-  segment:          { flex: 1, padding: 8, alignItems: 'center', borderRadius: 6 },
+  segmentedControl: { flexDirection: 'row', marginHorizontal: 20, marginBottom: 8, backgroundColor: '#e1e0db', borderRadius: 12, padding: 3, gap: 2 },
+  segment:          { flex: 1, padding: 10, alignItems: 'center', borderRadius: 10 },
   segmentActive:    { backgroundColor: colors.white, shadowColor: '#000', shadowOffset: { width: 0, height: 1 }, shadowOpacity: 0.1, shadowRadius: 2, elevation: 2 },
-  segmentText:      { fontSize: 12, fontWeight: '400', color: colors.textMuted },
-  segmentTextActive: { fontWeight: '600', color: colors.text },
+  segmentText:      { fontSize: 14, fontWeight: '400', fontFamily: FF.regular, color: colors.textMuted },
+  segmentTextActive: { fontWeight: '600', fontFamily: FF.semibold, color: colors.text },
 
   // Form fields (manual entry)
-  formHeader:   { padding: 12 },
-  formTitle:    { fontSize: 13, fontWeight: '600', color: colors.text, marginBottom: 2 },
-  formSubtitle: { fontSize: 11, fontWeight: '300', color: colors.textMuted },
-  formRow:      { flexDirection: 'row', alignItems: 'center', paddingHorizontal: 12, paddingVertical: 10, gap: 10 },
-  formLabel:    { width: 100, fontSize: 12, fontWeight: '400', color: colors.textMid },
-  formInput:    { flex: 1, backgroundColor: colors.bg, borderRadius: 6, paddingHorizontal: 10, paddingVertical: 7, fontSize: 13, fontWeight: '400', color: colors.text, borderWidth: 0.5, borderColor: colors.borderLight },
+  formHeader:   { padding: 16 },
+  formTitle:    { fontSize: 15, fontWeight: '600', fontFamily: FF.semibold, color: colors.text, marginBottom: 2 },
+  formSubtitle: { fontSize: 13, fontWeight: '300', fontFamily: FF.light, color: colors.textMuted },
+  formRow:      { flexDirection: 'row', alignItems: 'center', paddingHorizontal: 16, paddingVertical: 12, gap: 12 },
+  formLabel:    { width: 100, fontSize: 14, fontWeight: '400', fontFamily: FF.regular, color: colors.textMid },
+  formInput:    { flex: 1, backgroundColor: colors.bg, borderRadius: 10, paddingHorizontal: 14, paddingVertical: 10, fontSize: 15, fontWeight: '400', fontFamily: FF.regular, color: colors.text },
 
   // Duration inputs
   durationInputs: { flex: 1, flexDirection: 'row', alignItems: 'center', gap: 6 },
   durationField:  { flex: 1, minWidth: 44, textAlign: 'center' },
-  durationLabel:  { fontSize: 11, fontWeight: '300', color: colors.textMuted },
+  durationLabel:  { fontSize: 11, fontWeight: '300', fontFamily: FF.light, color: colors.textMuted },
 
   // Strava card
-  stravaHeader: { flexDirection: 'row', alignItems: 'center', padding: 12, gap: 10 },
-  stravaLogo:   { width: 32, height: 32, borderRadius: 7, backgroundColor: '#FC4C0220', alignItems: 'center', justifyContent: 'center', flexShrink: 0 },
-  stravaLogoText: { fontSize: 15, fontWeight: '700', color: '#fc4c02' },
-  stravaAction: { padding: 12, alignItems: 'center' },
-  stravaActionText: { fontSize: 13, fontWeight: '500', color: '#fc4c02' },
+  stravaHeader: { flexDirection: 'row', alignItems: 'center', padding: 16, gap: 12 },
+  stravaLogo:   { width: 38, height: 38, borderRadius: 11, backgroundColor: '#FC4C0220', alignItems: 'center', justifyContent: 'center', flexShrink: 0 },
+  stravaLogoText: { fontSize: 17, fontWeight: '700', fontFamily: FF.semibold, color: '#fc4c02' },
+  stravaAction: { padding: 16, alignItems: 'center' },
+  stravaActionText: { fontSize: 15, fontWeight: '500', fontFamily: FF.medium, color: '#fc4c02' },
   stravaActions:    { flexDirection: 'row', justifyContent: 'space-between' },
   stravaDisconnect: { padding: 12, alignItems: 'center' },
-  stravaDisconnectText: { fontSize: 12, fontWeight: '400', color: colors.textMuted },
+  stravaDisconnectText: { fontSize: 12, fontWeight: '400', fontFamily: FF.regular, color: colors.textMuted },
   stravaErrorRow:  { paddingHorizontal: 12, paddingBottom: 8 },
-  stravaErrorText: { fontSize: 10, fontWeight: '300', color: colors.warn },
+  stravaErrorText: { fontSize: 10, fontWeight: '300', fontFamily: FF.light, color: colors.warn },
 
   statusDotConnected:    { width: 8, height: 8, borderRadius: 4, backgroundColor: colors.good },
   statusDotDisconnected: { width: 8, height: 8, borderRadius: 4, backgroundColor: colors.border },
 
   // Stats grid
   statsGrid:       { flexDirection: 'row' },
-  statCell:        { flex: 1, padding: 10, alignItems: 'center' },
+  statCell:        { flex: 1, padding: 14, alignItems: 'center' },
   statCellBorder:  { borderLeftWidth: 0.5, borderLeftColor: colors.borderLight },
-  statLabel:       { fontSize: 8, fontWeight: '400', color: colors.textMuted, textTransform: 'uppercase', letterSpacing: 0.4, marginBottom: 2 },
-  statValue:       { fontSize: 14, fontWeight: '500', color: colors.text },
+  statLabel:       { fontSize: 10, fontWeight: '400', fontFamily: FF.regular, color: colors.textMuted, textTransform: 'uppercase', letterSpacing: 0.4, marginBottom: 2 },
+  statValue:       { fontSize: 16, fontWeight: '500', fontFamily: FF.medium, color: colors.text },
 
   // Constraint summary
-  constraintRow:   { flexDirection: 'row', alignItems: 'center', padding: 12, gap: 8 },
-  constraintLabel: { fontSize: 11, fontWeight: '400', color: colors.textMuted },
-  constraintValue: { flex: 1, fontSize: 12, fontWeight: '500', color: colors.text },
+  constraintRow:   { flexDirection: 'row', alignItems: 'center', padding: 16, gap: 8 },
+  constraintLabel: { fontSize: 11, fontWeight: '400', fontFamily: FF.regular, color: colors.textMuted },
+  constraintValue: { flex: 1, fontSize: 12, fontWeight: '500', fontFamily: FF.medium, color: colors.text },
 });

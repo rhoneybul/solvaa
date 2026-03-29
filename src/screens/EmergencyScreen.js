@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { View, Text, TouchableOpacity, StyleSheet, ScrollView, Alert } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { colors } from '../theme';
+import { colors, fontFamily } from '../theme';
 import { SheetHandle, SectionHeader, Toggle } from '../components/UI';
 
 export default function EmergencyScreen({ navigation }) {
@@ -120,26 +120,27 @@ export default function EmergencyScreen({ navigation }) {
   );
 }
 
+const FF = fontFamily;
 const s = StyleSheet.create({
   container: { flex: 1, backgroundColor: colors.bg },
   safe: { flex: 1 },
-  nav: { flexDirection: 'row', alignItems: 'center', paddingHorizontal: 12, paddingBottom: 8, paddingTop: 4, borderBottomWidth: 0.5, borderBottomColor: colors.border },
+  nav: { flexDirection: 'row', alignItems: 'center', paddingHorizontal: 20, paddingBottom: 8, paddingTop: 4, borderBottomWidth: 0.5, borderBottomColor: colors.border },
   back: { width: 36, height: 36, alignItems: 'center', justifyContent: 'center' },
-  backText: { fontSize: 22, color: colors.good },
-  navTitle: { flex: 1, fontSize: 15, fontWeight: '600', color: colors.text, marginLeft: 4 },
-  sosHero: { margin: 12, backgroundColor: colors.sos, borderRadius: 12, padding: 22, alignItems: 'center', shadowColor: colors.sos, shadowOffset: { width: 0, height: 3 }, shadowOpacity: 0.3, shadowRadius: 8, elevation: 5 },
-  sosCircle: { width: 52, height: 52, borderRadius: 26, backgroundColor: 'rgba(255,255,255,0.15)', alignItems: 'center', justifyContent: 'center', marginBottom: 10 },
-  sosCircleText: { fontSize: 24, fontWeight: '700', color: 'white' },
-  sosTitle: { fontSize: 20, fontWeight: '600', color: 'white', marginBottom: 6 },
-  sosSub: { fontSize: 11.5, fontWeight: '300', color: 'rgba(255,255,255,0.75)', textAlign: 'center', lineHeight: 18 },
-  card: { marginHorizontal: 12, marginBottom: 8, backgroundColor: colors.white, borderRadius: 9, borderWidth: 1, borderColor: colors.borderLight, overflow: 'hidden', shadowColor: '#000', shadowOffset: { width: 0, height: 0.5 }, shadowOpacity: 0.07, shadowRadius: 2, elevation: 1 },
-  row: { flexDirection: 'row', alignItems: 'center', padding: 12, paddingVertical: 11, gap: 10 },
+  backText: { fontSize: 24, color: colors.primary },
+  navTitle: { flex: 1, fontSize: 17, fontWeight: '600', fontFamily: FF.semibold, color: colors.text, marginLeft: 4 },
+  sosHero: { margin: 20, backgroundColor: colors.sos, borderRadius: 18, padding: 28, alignItems: 'center', shadowColor: colors.sos, shadowOffset: { width: 0, height: 3 }, shadowOpacity: 0.3, shadowRadius: 8, elevation: 5 },
+  sosCircle: { width: 56, height: 56, borderRadius: 28, backgroundColor: 'rgba(255,255,255,0.15)', alignItems: 'center', justifyContent: 'center', marginBottom: 10 },
+  sosCircleText: { fontSize: 26, fontWeight: '700', fontFamily: FF.semibold, color: 'white' },
+  sosTitle: { fontSize: 22, fontWeight: '600', fontFamily: FF.semibold, color: 'white', marginBottom: 6 },
+  sosSub: { fontSize: 13, fontWeight: '300', fontFamily: FF.light, color: 'rgba(255,255,255,0.75)', textAlign: 'center', lineHeight: 20 },
+  card: { marginHorizontal: 20, marginBottom: 8, backgroundColor: colors.white, borderRadius: 18, overflow: 'hidden', shadowColor: '#000', shadowOffset: { width: 0, height: 1 }, shadowOpacity: 0.06, shadowRadius: 12, elevation: 2 },
+  row: { flexDirection: 'row', alignItems: 'center', padding: 16, paddingVertical: 14, gap: 12 },
   rowMain: { flex: 1 },
-  rowLabel: { fontSize: 13, fontWeight: '400', color: colors.text, marginBottom: 1 },
-  rowSub: { fontSize: 11, fontWeight: '300', color: colors.textMuted },
+  rowLabel: { fontSize: 15, fontWeight: '400', fontFamily: FF.regular, color: colors.text, marginBottom: 1 },
+  rowSub: { fontSize: 13, fontWeight: '300', fontFamily: FF.light, color: colors.textMuted },
   sep: { height: 0.5, backgroundColor: colors.borderLight },
-  contactDot: { width: 8, height: 8, borderRadius: 4, backgroundColor: colors.textFaint },
-  activeDot: { width: 8, height: 8, borderRadius: 4, backgroundColor: colors.good },
-  checkDot: { width: 7, height: 7, borderRadius: 4, backgroundColor: colors.good },
-  addText: { fontSize: 13, fontWeight: '400', color: colors.blue },
+  contactDot: { width: 10, height: 10, borderRadius: 5, backgroundColor: colors.textFaint },
+  activeDot: { width: 10, height: 10, borderRadius: 5, backgroundColor: colors.good },
+  checkDot: { width: 10, height: 10, borderRadius: 5, backgroundColor: colors.good },
+  addText: { fontSize: 15, fontWeight: '400', fontFamily: FF.regular, color: colors.blue },
 });

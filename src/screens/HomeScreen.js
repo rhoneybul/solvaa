@@ -1,24 +1,17 @@
-import { useEffect, useState, useCallback } from 'react';
+import { useEffect, useState } from 'react';
 import {
-  View, Text, TouchableOpacity, StyleSheet, Platform, ActivityIndicator, Button,
+  View, Text, TouchableOpacity, StyleSheet, Image, Platform,
 } from 'react-native';
 import * as Sentry from '@sentry/react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { colors } from '../theme';
+import { colors, fontFamily } from '../theme';
 import { getCurrentUser, signOut } from '../services/authService';
-import {
-  connectStrava, disconnectStrava, getStravaTokens, getStravaAthlete,
-  handleStravaWebCallback, isStravaConfigured,
-} from '../services/stravaService';
-import StravaLogo from '../components/StravaLogo';
+import { getStravaTokens } from '../services/stravaService';
 import { SearchIcon } from '../components/Icons';
 
 export default function HomeScreen({ navigation }) {
-  const [name, setName]                   = useState(null);
-  const [stravaAthlete, setStravaAthlete] = useState(null);
+  const [name, setName]                       = useState(null);
   const [stravaConnected, setStravaConnected] = useState(false);
-  const [stravaLoading, setStravaLoading] = useState(false);
-  const [stravaError, setStravaError]     = useState(null);
 
   useEffect(() => {
     getCurrentUser().then(user => {
@@ -30,53 +23,9 @@ export default function HomeScreen({ navigation }) {
     });
   }, []);
 
-  const loadStrava = useCallback(async () => {
-    const tokens = await getStravaTokens();
-    if (tokens) {
-      setStravaConnected(true);
-      const athlete = await getStravaAthlete();
-      setStravaAthlete(athlete);
-    } else {
-      setStravaConnected(false);
-      setStravaAthlete(null);
-    }
-  }, []);
-
   useEffect(() => {
-    loadStrava();
-    if (Platform.OS === 'web' && typeof window !== 'undefined') {
-      const params = new URLSearchParams(window.location.search);
-      const code   = params.get('code');
-      const scope  = params.get('scope');
-      if (code && scope) {
-        window.history.replaceState({}, '', window.location.pathname);
-        setStravaLoading(true);
-        handleStravaWebCallback(code)
-          .then(athlete => { setStravaConnected(true); setStravaAthlete(athlete); })
-          .catch(err => setStravaError(err.message))
-          .finally(() => setStravaLoading(false));
-      }
-    }
+    getStravaTokens().then(tokens => setStravaConnected(!!tokens));
   }, []);
-
-  const handleConnectStrava = async () => {
-    setStravaLoading(true);
-    setStravaError(null);
-    try {
-      const athlete = await connectStrava();
-      if (athlete) { setStravaConnected(true); setStravaAthlete(athlete); }
-    } catch (err) {
-      setStravaError(err.message);
-    } finally {
-      if (Platform.OS !== 'web') setStravaLoading(false);
-    }
-  };
-
-  const handleDisconnectStrava = async () => {
-    await disconnectStrava();
-    setStravaConnected(false);
-    setStravaAthlete(null);
-  };
 
   const handleSignOut = async () => {
     await signOut();
@@ -86,7 +35,15 @@ export default function HomeScreen({ navigation }) {
   const firstName = name?.split(' ')[0] ?? null;
 
   return (
-    <SafeAreaView style={s.container}>
+    <View style={s.bgImage}>
+      <Image
+        source={require('../../assets/coast.jpg')}
+        style={s.bgImageInner}
+        resizeMode="cover"
+      />
+      {/* Greyscale overlay */}
+      <View style={s.bgOverlay} />
+      <SafeAreaView style={s.container}>
       {/* Header */}
       <View style={s.header}>
         <View>
@@ -149,123 +106,69 @@ export default function HomeScreen({ navigation }) {
           <Text style={s.actionChevron}>›</Text>
         </TouchableOpacity>
 
-        <View style={s.actionDivider} />
-
-        <TouchableOpacity
-          style={[s.actionRow, !stravaConnected && s.actionRowDimmed]}
-          onPress={() => navigation.navigate('YourPaddles')}
-          activeOpacity={0.75}
-        >
-          <View style={[s.actionIconWrap, s.actionIconStrava, !stravaConnected && s.actionIconDimmed]}>
-            <Text style={s.actionIconSymbol}>⚑</Text>
-          </View>
-          <View style={s.actionTextWrap}>
-            <Text style={[s.actionLabel, !stravaConnected && s.actionLabelDimmed]}>Your Paddles</Text>
-            <Text style={s.actionSub}>
-              {stravaConnected ? 'Kayaking history from Strava' : 'Connect Strava to see your paddles'}
-            </Text>
-          </View>
-          {!stravaConnected
-            ? <View style={s.lockBadge}><Text style={s.lockBadgeText}>Connect</Text></View>
-            : <Text style={s.actionChevron}>›</Text>
-          }
-        </TouchableOpacity>
-      </View>
-
-      {/* Connections */}
-      <Text style={s.sectionLabel}>CONNECTIONS</Text>
-      <View style={s.stravaRow}>
-        <View style={s.stravaLogoWrap}>
-          <StravaLogo size={18} />
-        </View>
-        <View style={[s.statusDot, { backgroundColor: stravaConnected ? colors.primary : colors.border }]} />
-        <View style={s.stravaLeft}>
-          <Text style={s.stravaLabel}>Strava</Text>
-          {stravaConnected && stravaAthlete ? (
-            <Text style={s.stravaSub}>{stravaAthlete.firstname} {stravaAthlete.lastname} · connected</Text>
-          ) : (
-            <Text style={s.stravaSub}>{isStravaConfigured() ? 'Not connected' : 'Credentials not set in .env'}</Text>
-          )}
-          {stravaError ? <Text style={s.stravaErr}>{stravaError}</Text> : null}
-        </View>
-        {isStravaConfigured() && (
-          stravaLoading ? (
-            <ActivityIndicator size="small" color={colors.textMuted} />
-          ) : stravaConnected ? (
-            <TouchableOpacity onPress={handleDisconnectStrava} hitSlop={{ top: 8, bottom: 8, left: 12, right: 0 }}>
-              <Text style={s.stravaActionMuted}>Disconnect</Text>
-            </TouchableOpacity>
-          ) : (
-            <TouchableOpacity onPress={handleConnectStrava} hitSlop={{ top: 8, bottom: 8, left: 12, right: 0 }}>
-              <Text style={s.stravaActionPrimary}>Connect</Text>
-            </TouchableOpacity>
-          )
-        )}
       </View>
     </SafeAreaView>
+    </View>
   );
 }
 
+const FF = fontFamily;
 const s = StyleSheet.create({
-  container:    { flex: 1, backgroundColor: colors.bg, paddingHorizontal: 16, paddingTop: 8 },
+  bgImage:      { flex: 1, backgroundColor: colors.bg },
+  bgImageInner: {
+    position: 'absolute', bottom: 0, left: 0,
+    width: '100%', height: '55%',
+    opacity: 0.45,
+    ...Platform.select({ web: { filter: 'grayscale(100%)' } }),
+  },
+  bgOverlay:    { ...StyleSheet.absoluteFillObject, backgroundColor: colors.bg, opacity: 0.45 },
+  container:    { flex: 1, paddingHorizontal: 20, paddingTop: 8 },
 
   header:       { flexDirection: 'row', alignItems: 'flex-start', justifyContent: 'space-between', paddingVertical: 16 },
-  appName:      { fontSize: 26, fontWeight: '600', color: colors.text },
-  greeting:     { fontSize: 15, fontWeight: '400', color: colors.textMuted, marginTop: 1 },
-  subtitle:     { fontSize: 13, fontWeight: '400', color: colors.textMuted, marginTop: 2 },
+  appName:      { fontSize: 28, fontWeight: '600', fontFamily: FF.semibold, color: colors.text },
+  greeting:     { fontSize: 16, fontWeight: '400', fontFamily: FF.regular, color: colors.textMuted, marginTop: 1 },
+  subtitle:     { fontSize: 14, fontWeight: '400', fontFamily: FF.regular, color: colors.textMuted, marginTop: 2 },
   menuBtn:      { padding: 4, marginTop: 4 },
-  menuText:     { fontSize: 18, fontWeight: '600', color: colors.textMid, letterSpacing: 1 },
+  menuText:     { fontSize: 20, fontWeight: '600', fontFamily: FF.semibold, color: colors.textMid, letterSpacing: 1 },
 
   planCta: {
     flexDirection: 'row', alignItems: 'center', gap: 14,
-    backgroundColor: colors.primary, borderRadius: 16,
-    paddingHorizontal: 16, paddingVertical: 16, marginBottom: 12,
+    backgroundColor: '#4A6CF7', borderRadius: 18,
+    paddingHorizontal: 18, paddingVertical: 18, marginBottom: 12,
   },
-  planCtaIcon:     { width: 36, height: 36, borderRadius: 18, backgroundColor: 'rgba(255,255,255,0.2)', alignItems: 'center', justifyContent: 'center' },
-  planCtaIconText: { fontSize: 22, fontWeight: '300', color: '#fff', lineHeight: 28 },
+  planCtaIcon:     { width: 38, height: 38, borderRadius: 19, backgroundColor: 'rgba(255,255,255,0.2)', alignItems: 'center', justifyContent: 'center' },
+  planCtaIconText: { fontSize: 24, fontWeight: '300', fontFamily: FF.light, color: '#fff', lineHeight: 30 },
   planCtaText:     { flex: 1 },
-  planCtaTitle:    { fontSize: 15, fontWeight: '600', color: '#fff' },
-  planCtaSub:      { fontSize: 11, fontWeight: '400', color: 'rgba(255,255,255,0.75)', marginTop: 1 },
-  planCtaArrow:    { fontSize: 22, fontWeight: '300', color: 'rgba(255,255,255,0.6)' },
+  planCtaTitle:    { fontSize: 17, fontWeight: '600', fontFamily: FF.semibold, color: '#fff' },
+  planCtaSub:      { fontSize: 13, fontWeight: '400', fontFamily: FF.regular, color: 'rgba(255,255,255,0.75)', marginTop: 1 },
+  planCtaArrow:    { fontSize: 24, fontWeight: '300', fontFamily: FF.light, color: 'rgba(255,255,255,0.6)' },
+
+  startPaddleCta: {
+    flexDirection: 'row', alignItems: 'center', gap: 14,
+    backgroundColor: colors.white, borderRadius: 18,
+    paddingHorizontal: 18, paddingVertical: 16, marginBottom: 12,
+    borderWidth: 1.5, borderColor: colors.primary,
+    shadowColor: '#1e3a8a', shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.06, shadowRadius: 12, elevation: 3,
+  },
+  startPaddleIcon:     { width: 38, height: 38, borderRadius: 19, backgroundColor: colors.primaryLight, alignItems: 'center', justifyContent: 'center' },
+  startPaddleIconText: { fontSize: 16, color: colors.primary },
+  startPaddleTextWrap: { flex: 1 },
+  startPaddleTitle:    { fontSize: 15, fontWeight: '600', fontFamily: FF.semibold, color: colors.text },
+  startPaddleSub:      { fontSize: 12, fontWeight: '400', fontFamily: FF.regular, color: colors.textMuted, marginTop: 1 },
 
   actionsCard: {
-    backgroundColor: colors.white, borderRadius: 14, borderWidth: 1, borderColor: colors.borderLight,
-    shadowColor: '#1e3a8a', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.07, shadowRadius: 8, elevation: 2,
+    backgroundColor: colors.white, borderRadius: 18,
+    shadowColor: '#1e3a8a', shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.06, shadowRadius: 12, elevation: 3,
     overflow: 'hidden', marginBottom: 20,
   },
-  actionRow:        { flexDirection: 'row', alignItems: 'center', gap: 12, paddingHorizontal: 14, paddingVertical: 13 },
-  actionIconWrap:   { width: 32, height: 32, borderRadius: 9, backgroundColor: colors.primary, alignItems: 'center', justifyContent: 'center', flexShrink: 0 },
+  actionRow:        { flexDirection: 'row', alignItems: 'center', gap: 14, paddingHorizontal: 18, paddingVertical: 16 },
+  actionIconWrap:   { width: 38, height: 38, borderRadius: 11, backgroundColor: colors.primary, alignItems: 'center', justifyContent: 'center', flexShrink: 0 },
   actionIconNeutral:{ backgroundColor: colors.bgDeep },
   actionIconSaved:  { backgroundColor: colors.primaryLight },
-  actionIconSymbol: { fontSize: 14, color: colors.textMid, lineHeight: 18 },
+  actionIconSymbol: { fontSize: 16, color: colors.textMid, lineHeight: 20 },
   actionTextWrap:   { flex: 1 },
-  actionLabel:      { fontSize: 13, fontWeight: '500', color: colors.text },
-  actionSub:        { fontSize: 10, fontWeight: '400', color: colors.textMuted, marginTop: 1 },
-  actionChevron:    { fontSize: 18, fontWeight: '300', color: colors.textFaint },
-  actionDivider:    { height: 0.5, backgroundColor: colors.borderLight, marginLeft: 58 },
-  actionIconStrava: { backgroundColor: '#FC4C0218' },
-  actionIconDimmed: { opacity: 0.45 },
-  actionRowDimmed:  { opacity: 0.7 },
-  actionLabelDimmed:{ color: colors.textMuted },
-  lockBadge:        { backgroundColor: colors.primaryLight, borderRadius: 6, paddingHorizontal: 9, paddingVertical: 4 },
-  lockBadgeText:    { fontSize: 11, fontWeight: '600', color: colors.primary },
-
-  sectionLabel: {
-    fontSize: 10, fontWeight: '600', color: colors.textMuted,
-    textTransform: 'uppercase', letterSpacing: 0.7, marginBottom: 8,
-  },
-
-  stravaRow: {
-    flexDirection: 'row', alignItems: 'center', gap: 10,
-    backgroundColor: colors.white, borderRadius: 14, borderWidth: 1, borderColor: colors.borderLight,
-    padding: 14,
-  },
-  stravaLogoWrap:      { width: 28, height: 28, borderRadius: 7, backgroundColor: '#FC4C0215', alignItems: 'center', justifyContent: 'center', flexShrink: 0 },
-  stravaLeft:          { flex: 1 },
-  statusDot:           { width: 8, height: 8, borderRadius: 4, flexShrink: 0 },
-  stravaLabel:         { fontSize: 13, fontWeight: '500', color: colors.text, marginBottom: 1 },
-  stravaSub:           { fontSize: 11, fontWeight: '400', color: colors.textMuted },
-  stravaErr:           { fontSize: 10, fontWeight: '400', color: colors.warn, marginTop: 2 },
-  stravaActionPrimary: { fontSize: 12.5, fontWeight: '600', color: colors.primary },
-  stravaActionMuted:   { fontSize: 12.5, fontWeight: '400', color: colors.textMuted },
+  actionLabel:      { fontSize: 15, fontWeight: '500', fontFamily: FF.medium, color: colors.text },
+  actionSub:        { fontSize: 12, fontWeight: '400', fontFamily: FF.regular, color: colors.textMuted, marginTop: 1 },
+  actionChevron:    { fontSize: 20, fontWeight: '300', fontFamily: FF.light, color: colors.textFaint },
+  actionDivider:    { height: 0.5, backgroundColor: colors.borderLight, marginLeft: 70 },
 });

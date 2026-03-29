@@ -2,9 +2,9 @@
  * Custom SVG icon set — clean rounded line icons.
  * All icons accept: size (number), color (string), strokeWidth (number).
  */
-import Svg, { Path, Circle, Line, Polyline, Rect } from 'react-native-svg';
+import Svg, { Path, Circle, Line, Polyline, Rect, Polygon } from 'react-native-svg';
 
-const defaults = { size: 24, color: '#3a6a4a', strokeWidth: 1.7 };
+const defaults = { size: 24, color: '#4A6CF7', strokeWidth: 1.7 };
 
 function icon(renderFn) {
   return function Icon({ size = defaults.size, color = defaults.color, strokeWidth = defaults.strokeWidth }) {
@@ -97,5 +97,18 @@ export const CrosshairIcon = icon((p) => (
     <Line {...p} x1="12" y1="18" x2="12" y2="22" />
     <Line {...p} x1="2" y1="12" x2="6" y2="12" />
     <Line {...p} x1="18" y1="12" x2="22" y2="12" />
+  </>
+));
+
+// Navigation / compass arrow — a filled arrow pointing north-east
+export const NavigateIcon = icon((p) => (
+  <Path {...p} d="M3 11l19-9-9 19-2-8-8-2z" />
+));
+
+// Compass — circle with N/S needle, used for local knowledge
+export const CompassIcon = icon((p) => (
+  <>
+    <Circle {...p} cx="12" cy="12" r="10" />
+    <Polygon {...p} fill={p.stroke} points="16.24,7.76 14.12,14.12 7.76,16.24 9.88,9.88" />
   </>
 ));

@@ -3,7 +3,8 @@ import {
   View, Text, TouchableOpacity, StyleSheet, FlatList, ActivityIndicator, Image,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { colors } from '../theme';
+import { colors, fontFamily } from '../theme';
+import { HomeIcon } from '../components/Icons';
 import {
   isStravaConfigured, getStravaTokens, connectStrava,
   fetchStravaActivities, getStravaAthlete,
@@ -140,6 +141,9 @@ export default function YourPaddlesScreen({ navigation }) {
               <Text style={s.backText}>‹</Text>
             </TouchableOpacity>
             <Text style={s.navTitle}>Your Paddles</Text>
+            <TouchableOpacity onPress={() => navigation.navigate('Home')} style={s.back}>
+              <HomeIcon size={20} color={colors.primary} />
+            </TouchableOpacity>
           </View>
           <LockedState
             configured={isStravaConfigured()}
@@ -163,9 +167,9 @@ export default function YourPaddlesScreen({ navigation }) {
             <Text style={s.backText}>‹</Text>
           </TouchableOpacity>
           <Text style={s.navTitle}>Your Paddles</Text>
-          {athlete ? (
-            <Text style={s.navSub}>{athlete.firstname} {athlete.lastname}</Text>
-          ) : null}
+          <TouchableOpacity onPress={() => navigation.navigate('Home')} style={s.back}>
+            <HomeIcon size={20} color={colors.primary} />
+          </TouchableOpacity>
         </View>
 
         {loading ? (
@@ -187,9 +191,18 @@ export default function YourPaddlesScreen({ navigation }) {
             keyExtractor={a => String(a.id)}
             contentContainerStyle={s.list}
             ListHeaderComponent={
-              <Text style={s.countLabel}>
-                {activities.length} paddle{activities.length !== 1 ? 's' : ''} recorded
-              </Text>
+              <View>
+                <TouchableOpacity
+                  style={s.completedLink}
+                  activeOpacity={0.85}
+                  onPress={() => navigation.navigate('CompletedPaddles')}
+                >
+                  <Text style={s.completedLinkText}>View completed paddles →</Text>
+                </TouchableOpacity>
+                <Text style={s.countLabel}>
+                  {activities.length} Strava paddle{activities.length !== 1 ? 's' : ''}
+                </Text>
+              </View>
             }
             ListFooterComponent={
               !showAll && activities.length > 20 ? (
@@ -248,67 +261,73 @@ export default function YourPaddlesScreen({ navigation }) {
 
 // ── Styles ────────────────────────────────────────────────────────────────────
 
-const P = 14;
+const P = 20;
+const FF = fontFamily;
 const s = StyleSheet.create({
   container: { flex: 1, backgroundColor: colors.bg },
   safe:      { flex: 1 },
   centered:  { flex: 1, alignItems: 'center', justifyContent: 'center', padding: 40 },
 
-  nav:      { flexDirection: 'row', alignItems: 'center', paddingHorizontal: P, paddingVertical: 8, borderBottomWidth: 0.5, borderBottomColor: colors.border },
+  nav:      { flexDirection: 'row', alignItems: 'center', paddingHorizontal: 20, paddingVertical: 8, borderBottomWidth: 0.5, borderBottomColor: colors.border },
   back:     { width: 36, height: 36, alignItems: 'center', justifyContent: 'center' },
   backText: { fontSize: 22, color: colors.primary },
-  navTitle: { flex: 1, fontSize: 15, fontWeight: '600', color: colors.text, marginLeft: 4 },
-  navSub:   { fontSize: 11, fontWeight: '400', color: colors.textMuted },
+  navTitle: { flex: 1, fontSize: 17, fontWeight: '600', fontFamily: FF.semibold, color: colors.text, marginLeft: 4 },
+  navSub:   { fontSize: 13, fontWeight: '400', fontFamily: FF.regular, color: colors.textMuted },
 
   loadingIcon: { width: 72, height: 72, borderRadius: 16 },
-  loadingText: { fontSize: 12, fontWeight: '300', color: colors.textMuted, marginTop: 12 },
-  emptyTitle:  { fontSize: 16, fontWeight: '600', color: colors.text, marginBottom: 8 },
-  emptySub:    { fontSize: 13, fontWeight: '300', color: colors.textMuted, textAlign: 'center', lineHeight: 20 },
+  loadingText: { fontSize: 14, fontWeight: '300', fontFamily: FF.light, color: colors.textMuted, marginTop: 12 },
+  emptyTitle:  { fontSize: 18, fontWeight: '600', fontFamily: FF.semibold, color: colors.text, marginBottom: 8 },
+  emptySub:    { fontSize: 15, fontWeight: '300', fontFamily: FF.light, color: colors.textMuted, textAlign: 'center', lineHeight: 22 },
 
   list:        { padding: P, gap: 10 },
-  countLabel:  { fontSize: 10, fontWeight: '500', color: colors.textMuted, textTransform: 'uppercase', letterSpacing: 0.5, marginBottom: 4 },
+  countLabel:  { fontSize: 12, fontWeight: '500', fontFamily: FF.medium, color: colors.textMuted, textTransform: 'uppercase', letterSpacing: 0.5, marginBottom: 4 },
 
   activityCard: {
-    backgroundColor: colors.white, borderRadius: 12,
-    borderWidth: 1, borderColor: colors.borderLight,
-    padding: 13, overflow: 'hidden',
+    backgroundColor: colors.white, borderRadius: 18,
+    padding: 16, overflow: 'hidden',
     shadowColor: '#000', shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.05, shadowRadius: 3, elevation: 1,
+    shadowOpacity: 0.06, shadowRadius: 12, elevation: 2,
   },
   cardTop:      { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 5 },
-  typeBadge:    { backgroundColor: colors.primaryLight, borderRadius: 4, paddingHorizontal: 7, paddingVertical: 2 },
-  typeText:     { fontSize: 9.5, fontWeight: '600', color: colors.primary, textTransform: 'uppercase', letterSpacing: 0.4 },
-  dateText:     { fontSize: 10, fontWeight: '400', color: colors.textMuted },
-  activityName: { fontSize: 14, fontWeight: '600', color: colors.text, marginBottom: 10 },
-  statsRow:     { flexDirection: 'row', borderTopWidth: 0.5, borderTopColor: colors.borderLight, paddingTop: 10 },
+  typeBadge:    { backgroundColor: colors.primaryLight, borderRadius: 8, paddingHorizontal: 7, paddingVertical: 2 },
+  typeText:     { fontSize: 11, fontWeight: '600', fontFamily: FF.semibold, color: colors.primary, textTransform: 'uppercase', letterSpacing: 0.4 },
+  dateText:     { fontSize: 12, fontWeight: '400', fontFamily: FF.regular, color: colors.textMuted },
+  activityName: { fontSize: 16, fontWeight: '600', fontFamily: FF.semibold, color: colors.text, marginBottom: 10 },
+  statsRow:     { flexDirection: 'row', borderTopWidth: 0.5, borderTopColor: colors.borderLight, paddingTop: 12 },
   stat:         { flex: 1, alignItems: 'center' },
   statBorder:   { borderLeftWidth: 0.5, borderLeftColor: colors.borderLight },
-  statLabel:    { fontSize: 8, fontWeight: '400', color: colors.textMuted, textTransform: 'uppercase', letterSpacing: 0.3, marginBottom: 2 },
-  statValue:    { fontSize: 14, fontWeight: '500', color: colors.text },
+  statLabel:    { fontSize: 10, fontWeight: '400', fontFamily: FF.regular, color: colors.textMuted, textTransform: 'uppercase', letterSpacing: 0.3, marginBottom: 2 },
+  statValue:    { fontSize: 16, fontWeight: '500', fontFamily: FF.medium, color: colors.text },
 
   showMoreBtn:  { marginTop: 4, alignItems: 'center', paddingVertical: 14 },
-  showMoreText: { fontSize: 13, fontWeight: '500', color: colors.primary },
+  showMoreText: { fontSize: 13, fontWeight: '500', fontFamily: FF.medium, color: colors.primary },
+
+  completedLink: {
+    backgroundColor: colors.white, borderRadius: 14, padding: 14,
+    marginBottom: 12, alignItems: 'center',
+    shadowColor: '#000', shadowOffset: { width: 0, height: 1 }, shadowOpacity: 0.06, shadowRadius: 12, elevation: 2,
+  },
+  completedLinkText: { fontSize: 14, fontWeight: '500', fontFamily: FF.medium, color: colors.primary },
 
   // Locked state
   lockedWrap:  { flex: 1, padding: P },
-  ghostCard:   { backgroundColor: colors.white, borderRadius: 12, borderWidth: 1, borderColor: colors.borderLight, padding: 14, marginBottom: 10 },
+  ghostCard:   { backgroundColor: colors.white, borderRadius: 18, padding: 14, marginBottom: 10, shadowColor: '#000', shadowOffset: { width: 0, height: 1 }, shadowOpacity: 0.06, shadowRadius: 12, elevation: 2 },
   ghostTitle:  { height: 14, backgroundColor: colors.borderLight, borderRadius: 4, marginBottom: 8, width: '65%' },
   ghostMeta:   { height: 10, backgroundColor: colors.borderLight, borderRadius: 4, marginBottom: 6, width: '80%' },
   lockPanel: {
     position: 'absolute', bottom: 40, left: P, right: P,
-    backgroundColor: colors.white, borderRadius: 20,
-    borderWidth: 1, borderColor: colors.borderLight,
-    padding: 28, alignItems: 'center',
+    backgroundColor: colors.white, borderRadius: 22,
+    padding: 32, alignItems: 'center',
     shadowColor: '#000', shadowOffset: { width: 0, height: 8 },
-    shadowOpacity: 0.1, shadowRadius: 20, elevation: 8,
+    shadowOpacity: 0.06, shadowRadius: 12, elevation: 8,
   },
   lockIcon:     { width: 52, height: 52, borderRadius: 26, backgroundColor: colors.bgDeep, alignItems: 'center', justifyContent: 'center', marginBottom: 14 },
   lockIconText: { fontSize: 22 },
-  lockTitle:    { fontSize: 18, fontWeight: '600', color: colors.text, marginBottom: 8 },
-  lockBody:     { fontSize: 13, fontWeight: '300', color: colors.textMuted, textAlign: 'center', lineHeight: 19, marginBottom: 20 },
-  connectBtn:   { backgroundColor: '#FC4C02', borderRadius: 10, paddingHorizontal: 28, paddingVertical: 13 },
-  connectBtnText: { fontSize: 14, fontWeight: '600', color: '#fff' },
+  lockTitle:    { fontSize: 20, fontWeight: '600', fontFamily: FF.semibold, color: colors.text, marginBottom: 8 },
+  lockBody:     { fontSize: 15, fontWeight: '300', fontFamily: FF.light, color: colors.textMuted, textAlign: 'center', lineHeight: 22, marginBottom: 20 },
+  connectBtn:   { backgroundColor: '#FC4C02', borderRadius: 14, paddingHorizontal: 28, paddingVertical: 16 },
+  connectBtnText: { fontSize: 16, fontWeight: '600', fontFamily: FF.semibold, color: '#fff' },
   lockNote:     { backgroundColor: colors.bgDeep, borderRadius: 8, padding: 12, marginTop: 4 },
-  lockNoteText: { fontSize: 11, fontWeight: '300', color: colors.textMuted, textAlign: 'center', lineHeight: 17 },
-  lockError:    { fontSize: 11, fontWeight: '400', color: colors.warn, marginTop: 12, textAlign: 'center' },
+  lockNoteText: { fontSize: 11, fontWeight: '300', fontFamily: FF.light, color: colors.textMuted, textAlign: 'center', lineHeight: 17 },
+  lockError:    { fontSize: 11, fontWeight: '400', fontFamily: FF.regular, color: colors.warn, marginTop: 12, textAlign: 'center' },
 });

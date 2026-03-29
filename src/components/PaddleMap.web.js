@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef, useMemo } from 'react';
 import { View, Text, TextInput, Image, TouchableOpacity, Platform, ActivityIndicator } from 'react-native';
-import { colors } from '../theme';
+import { colors, fontFamily } from '../theme';
 
 // ── Coordinate parsers (shared with native) ───────────────────────────────────
 
@@ -93,13 +93,8 @@ function extractCriticalPoints(pts, minBearingChange = 35, maxPts = 8) {
   return result;
 }
 
-function difficultyColor(difficulty) {
-  const d = (difficulty || '').toLowerCase();
-  if (d === 'beginner' || d === 'easy')           return '#16a34a'; // green
-  if (d === 'intermediate' || d === 'moderate')   return '#2563EB'; // blue
-  if (d === 'advanced' || d === 'challenging')    return '#d97706'; // orange
-  if (d === 'expert')                             return '#dc2626'; // red
-  return '#2563EB';
+function difficultyColor(_difficulty) {
+  return '#4A6CF7'; // all routes use primary blue
 }
 
 const MAPBOX_TOKEN = process.env.EXPO_PUBLIC_MAPBOX_TOKEN;
@@ -159,8 +154,10 @@ export default function PaddleMap({
   staticView = false,
   tideHeightMap = {},
   tideExtremeMap = {},
+  followUser = false,
 }) {
   const [vpW, setVpW] = useState(390);
+  const renderStateRef = useRef({ zoom: 11, cx: 0, cy: 0 });
   const [searchVisible, setSearchVisible] = useState(false);
   const [searchQuery, setSearchQuery]     = useState('');
   const [searchLoading, setSearchLoading] = useState(false);
@@ -227,6 +224,17 @@ export default function PaddleMap({
 
   useEffect(() => { panOffset.current = { x: 0, y: 0 }; setPanState({ x: 0, y: 0 }); }, [selectedIdx, coords?.lat, coords?.lon]);
 
+  // Follow user: re-center map on latest GPS point
+  useEffect(() => {
+    if (!followUser || liveTrack.length === 0) return;
+    const last = liveTrack[liveTrack.length - 1];
+    const { zoom, cx, cy } = renderStateRef.current;
+    const newPanX = cx - lonToWorld(last.lon, zoom);
+    const newPanY = cy - latToWorld(last.lat, zoom);
+    panOffset.current = { x: newPanX, y: newPanY };
+    setPanState({ x: newPanX, y: newPanY });
+  }, [liveTrack, followUser]); // eslint-disable-line react-hooks/exhaustive-deps
+
   // Web: wheel-to-zoom + pinch-to-zoom via DOM events
   useEffect(() => {
     if (Platform.OS !== 'web') return;
@@ -281,7 +289,7 @@ export default function PaddleMap({
       const lons = pts.map(p => p.longitude);
       return { minLat: Math.min(...lats), maxLat: Math.max(...lats), minLon: Math.min(...lons), maxLon: Math.max(...lons) };
     }
-    if (coords) return { minLat: coords.lat, maxLat: coords.lat, minLon: coords.lon, maxLon: coords.lon };
+    if (coords && coords.lat != null && coords.lon != null && !isNaN(coords.lat) && !isNaN(coords.lon)) return { minLat: coords.lat, maxLat: coords.lat, minLon: coords.lon, maxLon: coords.lon };
     return null;
   }, [routes, coords]);
 
@@ -342,7 +350,7 @@ export default function PaddleMap({
   const allPts    = allParsed.flat();
 
   if (allPts.length === 0) {
-    if (!coords) {
+    if (!coords || coords.lat == null || coords.lon == null || isNaN(coords.lat) || isNaN(coords.lon)) {
       return (
         <View style={{ height, backgroundColor: '#c8dce8', alignItems: 'center', justifyContent: 'center' }}>
           <Text style={{ fontSize: 11, color: colors.textMuted }}>Map will appear here</Text>
@@ -413,7 +421,7 @@ export default function PaddleMap({
             <>
               <rect x={pinScreenX - 36} y={pinScreenY - 32} width={72} height={18} rx={5} fill="rgba(255,255,255,0.93)" />
               <text x={pinScreenX} y={pinScreenY - 19} textAnchor="middle" fontSize="9" fontWeight="600"
-                fill={colors.primary} fontFamily="Inter, -apple-system, sans-serif">
+                fill={colors.primary} fontFamily="Poppins, -apple-system, sans-serif">
                 {overlayTitle.length > 18 ? overlayTitle.slice(0, 16) + '…' : overlayTitle}
               </text>
             </>
@@ -446,6 +454,7 @@ export default function PaddleMap({
 
   const vpX = cx - vpW / 2 - panState.x;
   const vpY = cy - height / 2 - panState.y;
+  renderStateRef.current = { zoom, cx, cy };
 
   const txStart = Math.floor(vpX / TILE_SIZE);
   const tyStart = Math.floor(vpY / TILE_SIZE);
@@ -629,10 +638,10 @@ export default function PaddleMap({
           if (kps.length === 0) return null;
           const isLoop = kps.length >= 2 && haversineM(kps[0], kps[kps.length - 1]) < 300;
 
-          const LAUNCH_COL = '#16a34a';
-          const FINISH_COL = '#dc2626';
-          const TURN_COL   = '#2563eb';
-          const F          = 'Inter, -apple-system, sans-serif';
+          const LAUNCH_COL = '#4A6CF7';
+          const FINISH_COL = '#4A6CF7';
+          const TURN_COL   = '#4A6CF7';
+          const F          = 'Poppins, -apple-system, sans-serif';
 
           return (
             <g>
@@ -722,23 +731,33 @@ export default function PaddleMap({
         })()}
 
         {/* Live GPS track */}
-        {liveTrack.length >= 2 && (() => {
-          const lsp = liveTrack.map(p => toScreen(p.lat, p.lon));
-          const d   = 'M' + lsp.map(p => `${p.x.toFixed(1)} ${p.y.toFixed(1)}`).join('L');
-          const tip = lsp[lsp.length - 1];
-          return (
-            <g>
-              <path d={d} stroke="#16a34a" strokeWidth={3} fill="none" strokeLinecap="round" strokeLinejoin="round" />
-              <circle cx={tip.x} cy={tip.y} r={7} fill="#16a34a" stroke="#fff" strokeWidth={2.5} />
-              <circle cx={tip.x} cy={tip.y} r={3} fill="#fff" />
-            </g>
-          );
+        {(() => {
+          // Track polyline
+          const trackEl = liveTrack.length >= 2 ? (() => {
+            const lsp = liveTrack.map(p => toScreen(p.lat, p.lon));
+            const d   = 'M' + lsp.map(p => `${p.x.toFixed(1)} ${p.y.toFixed(1)}`).join('L');
+            return <path d={d} stroke="#16a34a" strokeWidth={3} fill="none" strokeLinecap="round" strokeLinejoin="round" />;
+          })() : null;
+          // Live position dot — from track tip or coords fallback
+          const livePt = liveTrack.length >= 1
+            ? liveTrack[liveTrack.length - 1]
+            : (followUser && coords ? { lat: coords.lat, lon: coords.lon } : null);
+          const dotEl = livePt ? (() => {
+            const tip = toScreen(livePt.lat, livePt.lon);
+            return (
+              <g>
+                <circle cx={tip.x} cy={tip.y} r={7} fill="#16a34a" stroke="#fff" strokeWidth={2.5} />
+                <circle cx={tip.x} cy={tip.y} r={3} fill="#fff" />
+              </g>
+            );
+          })() : null;
+          return <>{trackEl}{dotEl}</>;
         })()}
 
         {/* Landmark search markers */}
         {landmarks.map((lm, i) => {
           const sp = toScreen(lm.lat, lm.lon);
-          const F  = 'Inter, -apple-system, sans-serif';
+          const F  = 'Poppins, -apple-system, sans-serif';
           const labelW = Math.min(lm.name.length * 5.5 + 12, 160);
           return (
             <g key={`lm${i}`}>
@@ -803,7 +822,13 @@ export default function PaddleMap({
             <TouchableOpacity
               onPress={() => { setZoomDelta(0); panOffset.current = { x: 0, y: 0 }; setPanState({ x: 0, y: 0 }); }}
               style={{ width: 32, height: 32, alignItems: 'center', justifyContent: 'center' }} activeOpacity={0.7}>
-              <Text style={{ fontSize: 13, color: colors.primary, lineHeight: 15 }}>⊙</Text>
+              <svg width={16} height={16} viewBox="0 0 24 24" fill="none" stroke={colors.primary} strokeWidth={2} strokeLinecap="round" strokeLinejoin="round">
+                <circle cx="12" cy="12" r="4" />
+                <line x1="12" y1="2" x2="12" y2="6" />
+                <line x1="12" y1="18" x2="12" y2="22" />
+                <line x1="2" y1="12" x2="6" y2="12" />
+                <line x1="18" y1="12" x2="22" y2="12" />
+              </svg>
             </TouchableOpacity>
           </View>
         )}
@@ -832,7 +857,7 @@ export default function PaddleMap({
           {searchLoading
             ? <ActivityIndicator size="small" color={colors.primary} style={{ marginHorizontal: 6 }} />
             : <TouchableOpacity onPress={handleSearch} style={{ paddingHorizontal: 8, paddingVertical: 4 }} activeOpacity={0.7}>
-                <Text style={{ fontSize: 11, fontWeight: '600', color: colors.primary }}>Go</Text>
+                <Text style={{ fontSize: 11, fontWeight: '600', fontFamily: fontFamily.semibold, color: colors.primary }}>Go</Text>
               </TouchableOpacity>
           }
           <TouchableOpacity onPress={() => { setSearchVisible(false); setSearchQuery(''); setLandmarks([]); }} style={{ paddingHorizontal: 6 }} activeOpacity={0.7}>
@@ -841,18 +866,18 @@ export default function PaddleMap({
         </View>
       ) : !staticView ? (
         <TouchableOpacity
-          style={{ position: 'absolute', top: 8, left: 8, width: 32, height: 32, borderRadius: 8, backgroundColor: 'rgba(255,255,255,0.93)', alignItems: 'center', justifyContent: 'center', borderWidth: 1, borderColor: 'rgba(0,0,0,0.12)' }}
+          style={{ position: 'absolute', top: 8, left: 8, width: 36, height: 36, borderRadius: 10, backgroundColor: 'rgba(255,255,255,0.93)', alignItems: 'center', justifyContent: 'center', borderWidth: 1, borderColor: 'rgba(0,0,0,0.12)' }}
           onPress={() => setSearchVisible(true)}
           activeOpacity={0.75}
         >
-          <Text style={{ fontSize: 17, color: colors.primary }}>⌕</Text>
+          <Text style={{ fontSize: 22, color: colors.primary }}>⌕</Text>
         </TouchableOpacity>
       ) : null}
 
       {/* Title overlay */}
       {(overlayTitle || overlayMeta) && (
         <View style={{ position: 'absolute', bottom: 12, left: 12, right: 60, backgroundColor: 'rgba(255,255,255,0.92)', borderRadius: 10, paddingHorizontal: 12, paddingVertical: 8 }}>
-          {overlayTitle ? <Text style={{ fontSize: 13, fontWeight: '600', color: colors.text }} numberOfLines={1}>{overlayTitle}</Text> : null}
+          {overlayTitle ? <Text style={{ fontSize: 13, fontWeight: '600', fontFamily: fontFamily.semibold, color: colors.text }} numberOfLines={1}>{overlayTitle}</Text> : null}
           {overlayMeta  ? <Text style={{ fontSize: 11, color: colors.textMuted, marginTop: 2 }} numberOfLines={1}>{overlayMeta}</Text> : null}
         </View>
       )}
@@ -872,9 +897,9 @@ export default function PaddleMap({
         const TIDE_H     = hasTides ? 14 : 0;
         const TIDE_LBL_H = hasTides ? 18 : 0;
         const LABEL_H    = 9;
-        const PAD_TOP    = 5;
-        const PAD_BOT    = 3;
-        const GAP        = hasTides ? 3 : 0;
+        const PAD_TOP    = 10;
+        const PAD_BOT    = 8;
+        const GAP        = hasTides ? 6 : 0;
         const STRIP_H    = PAD_TOP + WIND_MAX + GAP + TIDE_H + (hasTides ? 2 : 0) + TIDE_LBL_H + 2 + LABEL_H + PAD_BOT;
         const WIND_BASE  = PAD_TOP + WIND_MAX;
         const TIDE_TOP   = WIND_BASE + GAP;
@@ -913,7 +938,7 @@ export default function PaddleMap({
 
         return (
           <View
-            style={{ position: 'absolute', bottom: 8, left: 8, right: 8, height: STRIP_H, backgroundColor: 'rgba(255,255,255,0.93)', borderRadius: 8, overflow: 'hidden', borderWidth: 0.5, borderColor: 'rgba(0,0,0,0.1)' }}
+            style={{ position: 'absolute', bottom: 10, left: 10, right: 10, height: STRIP_H, backgroundColor: 'rgba(255,255,255,0.93)', borderRadius: 12, overflow: 'hidden', borderWidth: 0.5, borderColor: 'rgba(0,0,0,0.08)' }}
             onStartShouldSetResponder={() => true}
             onResponderRelease={e => {
               const rect = e.currentTarget?.getBoundingClientRect?.();
@@ -950,18 +975,18 @@ export default function PaddleMap({
                     {/* Wind direction arrow above bar */}
                     {rotateDeg != null && barH >= 5 && (
                       <text x={x} y={WIND_BASE - barH - 2}
-                        textAnchor="middle" fontSize="7" fill={col} fontFamily="system-ui,sans-serif"
+                        textAnchor="middle" fontSize="7" fill={col} fontFamily="Poppins, system-ui, sans-serif"
                         transform={`rotate(${rotateDeg},${x},${WIND_BASE - barH - 4})`}
                       >↑</text>
                     )}
                     {/* Knot value on bar (when bar tall enough), or just above if small */}
                     {spdRound > 0 && barH >= 8 && (
                       <text x={x} y={WIND_BASE - 2} textAnchor="middle" fontSize="5.5"
-                        fill="#fff" fontWeight="600" fontFamily="system-ui,sans-serif">{spdRound}</text>
+                        fill="#fff" fontWeight="600" fontFamily="Poppins, system-ui, sans-serif">{spdRound}</text>
                     )}
                     {spdRound > 0 && barH < 8 && barH >= 3 && (
                       <text x={x} y={WIND_BASE - barH - 1} textAnchor="middle" fontSize="5.5"
-                        fill={col} fontWeight="600" fontFamily="system-ui,sans-serif">{spdRound}</text>
+                        fill={col} fontWeight="600" fontFamily="Poppins, system-ui, sans-serif">{spdRound}</text>
                     )}
                   </g>
                 );
@@ -986,10 +1011,10 @@ export default function PaddleMap({
                     <circle cx={cx} cy={cy} r={2.5} fill="#2563eb" stroke="#fff" strokeWidth={0.8} />
                     {/* Exact turn time */}
                     <text x={cx} y={TIDE_BOT + 8} textAnchor="middle" fontSize={6} fontWeight="600"
-                      fill="#2563eb" fontFamily="system-ui,sans-serif">{ext.exactTime}</text>
+                      fill="#2563eb" fontFamily="Poppins, system-ui, sans-serif">{ext.exactTime}</text>
                     {/* Height */}
                     <text x={cx} y={TIDE_BOT + 16} textAnchor="middle" fontSize={5.5} fontWeight="400"
-                      fill="#2563eb" fontFamily="system-ui,sans-serif">{ht.toFixed(1)}m</text>
+                      fill="#2563eb" fontFamily="Poppins, system-ui, sans-serif">{ht.toFixed(1)}m</text>
                   </g>
                 );
               })}
@@ -1001,7 +1026,7 @@ export default function PaddleMap({
                 const lbl = hr < 12 ? `${hr}am` : hr === 12 ? '12p' : `${hr - 12}pm`;
                 return (
                   <text key={i} x={toX(i)} y={LABEL_Y} textAnchor="middle" fontSize={7}
-                    fill="rgba(0,0,0,0.38)" fontFamily="system-ui,sans-serif">{lbl}</text>
+                    fill="rgba(0,0,0,0.38)" fontFamily="Poppins, system-ui, sans-serif">{lbl}</text>
                 );
               })}
 
@@ -1017,7 +1042,7 @@ export default function PaddleMap({
                 const label  = tideHt != null ? `${selHr} · ${spd}kt · ${tideHt.toFixed(1)}m` : `${selHr} · ${spd}kt`;
                 return (
                   <text x={5} y={PAD_TOP + 7} fontSize={7.5} fontWeight="600"
-                    fill={wCol} fontFamily="system-ui,sans-serif">{label}</text>
+                    fill={wCol} fontFamily="Poppins, system-ui, sans-serif">{label}</text>
                 );
               })()}
             </svg>
