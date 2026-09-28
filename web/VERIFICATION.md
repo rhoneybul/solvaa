@@ -42,3 +42,5 @@ These checks cover one browser engine and viewport simulation, not a physical-de
 - Impeccable finish reviewer cleared all six material fixes. Documentation regenerated from current source; built blue token verified by DOM (`rgb(36, 101, 216)`).
 - Hosted Supabase sign-in/signup/recovery and account sync remain unverified: Vercel and Supabase dashboards require user login, and the previous bundled Supabase project hostname does not resolve. No remote migration was applied.
 - Public Overpass returned 406/504/timeouts. UI errors and retry work; existing launch suggestions and unpinned operator-directory links remain. No invented POI coordinates or navigability claims.
+
+- Published draft PR #10 on `codex/web-map-planner`; Vercel reports a Ready preview. Existing Vercel account protection redirects preview/API access to sign-in, so remote runtime smoke tests are blocked until dashboard access. GitHub Web checks passed.

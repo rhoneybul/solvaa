@@ -617,6 +617,7 @@ function Workspace({ auth }) {
               }
               onSave={savePlan}
               onSavedRoutes={() => navigate("trips")}
+              onSetHome={() => setOnboarding(true)}
               onNew={() => startNew().catch((e) => notify(e.message, "error"))}
             />
           )}

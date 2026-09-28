@@ -67,6 +67,7 @@ export default function MapPlanner({
   onDraft,
   onSave,
   onSavedRoutes,
+  onSetHome,
   onNew,
 }) {
   const auth = useAuth();
@@ -333,9 +334,13 @@ export default function MapPlanner({
               <div className="area-shortcuts">
                 <button
                   className="text-button"
-                  onClick={() => chooseArea(homeRegion(profile))}
+                  onClick={() =>
+                    profile.homeCoords
+                      ? chooseArea(homeRegion(profile))
+                      : onSetHome()
+                  }
                 >
-                  Near home
+                  {profile.homeCoords ? "Near home" : "Set home area"}
                 </button>
                 <details>
                   <summary>

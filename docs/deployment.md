@@ -14,6 +14,8 @@ Authentication emails need a configured SMTP service for a public launch. Supaba
 
 ## Existing deployment and access
 
+A new [Vercel preview](https://solvaa-git-codex-web-map-planner-rhoneybuls-projects.vercel.app) was deployed from [draft PR #10](https://github.com/rhoneybul/solvaa/pull/10). Vercel reported Ready and GitHub validation passed. The preview retains existing Vercel account protection, so browser/API smoke checks redirect to Vercel sign-in until access is supplied. Production promotion and hosted Supabase verification remain pending.
+
 - Repository: `rhoneybul/solvaa`, main branch.
 - Previous public website: https://paddle-kayak.vercel.app (Vercel project appears as `solvaa` in deployment records).
 - Old frontend public configuration references Supabase project `kseznjbmxhpdogrhyjfb` and the historical Railway API. The Supabase hostname did not resolve during this work. Inspect the dashboard for a paused/restorable project before creating another.
