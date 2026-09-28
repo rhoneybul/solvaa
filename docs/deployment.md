@@ -68,7 +68,11 @@ Do not enable the public Nominatim server on this Vercel architecture: its one-r
 
 ## Optional AI later
 
-After verifying the migration, set `CLAUDE_API_KEY`, a stable random `AI_IP_HASH_SECRET`, and `AI_ENABLED=true`. Default limits are 3/user/day, 10/user/month, one-minute cooldown, 10/IP/day, 20/site/day and 100/site/month. All paid entry points reserve an atomic PostgreSQL quota before the provider call. Errors count, output is at most 768 tokens, calls time out after 20 seconds and are not retried automatically. Missing quota storage blocks AI. Keep the provider's own spending cap low as a second bound.
+After verifying the migration, set `CLAUDE_API_KEY`, a stable random `AI_IP_HASH_SECRET`, and `AI_ENABLED=true`. Set `AI_MODEL=claude-sonnet-5-5` in Vercel (or omit it to use this default); replace any existing Haiku override, then redeploy. Use a Claude API key scoped to one workspace. No additional AI service needs deploying.
+
+Sonnet 5.5 is the more capable default for screenshot reading. Its current base prices are $2 per million input tokens and $10 per million output tokens; actual cost also depends on image tokenization. The request uses `thinking.type=between_tools` with medium effort so these short, tool-free calls preserve their output budget for the extracted answer. Earlier model overrides retain their original request format. [Model and pricing](https://platform.claude.com/docs/en/models/sonnet-5-5/overview), [migration settings](https://platform.claude.com/docs/en/models/sonnet-5-5/migration-guide).
+
+Default limits are 3/user/day, 10/user/month, one-minute cooldown, 10/IP/day, 20/site/day and 100/site/month. All paid entry points reserve an atomic PostgreSQL quota before the provider call. Errors count, output is at most 768 tokens, calls time out after 20 seconds and are not retried automatically. Missing quota storage blocks AI. Keep the provider's own spending cap low as a second bound. Model access and screenshot quality still require a live smoke test after credentials are configured.
 
 ## Verify before promoting
 

@@ -96,6 +96,7 @@ function createAiGuard({
 }
 
 async function callAi(system, messages, fetcher = fetch) {
+  const model = process.env.AI_MODEL || "claude-sonnet-5-5";
   const response = await fetcher("https://api.anthropic.com/v1/messages", {
     method: "POST",
     signal: AbortSignal.timeout(20000),
@@ -105,7 +106,15 @@ async function callAi(system, messages, fetcher = fetch) {
       "anthropic-version": "2023-06-01",
     },
     body: JSON.stringify({
-      model: process.env.AI_MODEL || "claude-haiku-4-5-20251001",
+      model,
+      // Sonnet 5.5 otherwise spends the shared output budget on thinking first.
+      // These short, tool-free reading requests need the budget for their answer.
+      ...(model === "claude-sonnet-5-5"
+        ? {
+            thinking: { type: "between_tools" },
+            output_config: { effort: "medium" },
+          }
+        : {}),
       max_tokens: 768,
       system,
       messages,
