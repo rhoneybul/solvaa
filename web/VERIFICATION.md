@@ -44,3 +44,5 @@ These checks cover one browser engine and viewport simulation, not a physical-de
 - Public Overpass returned 406/504/timeouts. UI errors and retry work; existing launch suggestions and unpinned operator-directory links remain. No invented POI coordinates or navigability claims.
 
 - Published draft PR #10 on `codex/web-map-planner`; Vercel reports a Ready preview. Existing Vercel account protection redirects preview/API access to sign-in, so remote runtime smoke tests are blocked until dashboard access. GitHub Web checks passed.
+
+- Follow-up: Overpass recovered; the browser displayed 23 launch points and 11 camping places near the test area. Selected Sligachan Campsite with its OSM way source and added it to day 1; route point count and distance remained zero. Added a regression that inland stops do not alter track geometry or GPX (37 tests total). Unnamed live launch points use hover labels to avoid a wall of duplicate permanent labels.

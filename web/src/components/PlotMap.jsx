@@ -230,7 +230,11 @@ export default function PlotMap({
           >
             <Tooltip
               key={String(showRoute)}
-              permanent={place.type === "launch" && !showRoute}
+              permanent={
+                place.type === "launch" &&
+                place.name !== "Mapped launch point" &&
+                !showRoute
+              }
               direction="top"
               offset={[0, -17]}
             >

@@ -361,7 +361,9 @@ function Workspace({ auth }) {
     const current = storeRef.current;
     const draft = current.draft;
     if (
-      draft?.days.some((d) => d.points.length) &&
+      draft?.days.some(
+        (d) => d.points.length || d.stops.length || d.notes.trim(),
+      ) &&
       JSON.stringify(draft) !==
         JSON.stringify(current.plans.find((p) => p.id === draft.id)) &&
       !window.confirm(
@@ -386,7 +388,9 @@ function Workspace({ auth }) {
     if (
       draft &&
       draft.id !== plan.id &&
-      draft.days.some((d) => d.points.length) &&
+      draft.days.some(
+        (d) => d.points.length || d.stops.length || d.notes.trim(),
+      ) &&
       JSON.stringify(draft) !==
         JSON.stringify(storeRef.current.plans.find((p) => p.id === draft.id)) &&
       !window.confirm("Open this route and replace your unsaved draft?")
