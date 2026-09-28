@@ -1,0 +1,434 @@
+{
+  "schemaVersion": 2,
+  "generatedAt": "2026-09-28T15:28:31.607194+00:00",
+  "title": "Design System: Solvaa Web",
+  "extensions": {
+    "colorMeta": {
+      "blue": {
+        "role": "primary",
+        "displayName": "Blue",
+        "tonalRamp": [
+          "oklch(15% 0.1887 260.92)",
+          "oklch(26% 0.1887 260.92)",
+          "oklch(38% 0.1887 260.92)",
+          "oklch(49% 0.1887 260.92)",
+          "oklch(61% 0.1887 260.92)",
+          "oklch(72% 0.1887 260.92)",
+          "oklch(84% 0.1887 260.92)",
+          "oklch(95% 0.1887 260.92)"
+        ]
+      },
+      "blue-deep": {
+        "role": "primary",
+        "displayName": "Blue Deep",
+        "tonalRamp": [
+          "oklch(15% 0.1597 260.88)",
+          "oklch(26% 0.1597 260.88)",
+          "oklch(38% 0.1597 260.88)",
+          "oklch(49% 0.1597 260.88)",
+          "oklch(61% 0.1597 260.88)",
+          "oklch(72% 0.1597 260.88)",
+          "oklch(84% 0.1597 260.88)",
+          "oklch(95% 0.1597 260.88)"
+        ]
+      },
+      "ink": {
+        "role": "neutral",
+        "displayName": "Ink",
+        "tonalRamp": [
+          "oklch(15% 0.0285 252.96)",
+          "oklch(26% 0.0285 252.96)",
+          "oklch(38% 0.0285 252.96)",
+          "oklch(49% 0.0285 252.96)",
+          "oklch(61% 0.0285 252.96)",
+          "oklch(72% 0.0285 252.96)",
+          "oklch(84% 0.0285 252.96)",
+          "oklch(95% 0.0285 252.96)"
+        ]
+      },
+      "muted": {
+        "role": "neutral",
+        "displayName": "Muted",
+        "tonalRamp": [
+          "oklch(15% 0.0291 250.19)",
+          "oklch(26% 0.0291 250.19)",
+          "oklch(38% 0.0291 250.19)",
+          "oklch(49% 0.0291 250.19)",
+          "oklch(61% 0.0291 250.19)",
+          "oklch(72% 0.0291 250.19)",
+          "oklch(84% 0.0291 250.19)",
+          "oklch(95% 0.0291 250.19)"
+        ]
+      },
+      "line": {
+        "role": "neutral",
+        "displayName": "Line",
+        "tonalRamp": [
+          "oklch(15% 0.0104 247.94)",
+          "oklch(26% 0.0104 247.94)",
+          "oklch(38% 0.0104 247.94)",
+          "oklch(49% 0.0104 247.94)",
+          "oklch(61% 0.0104 247.94)",
+          "oklch(72% 0.0104 247.94)",
+          "oklch(84% 0.0104 247.94)",
+          "oklch(95% 0.0104 247.94)"
+        ]
+      },
+      "pale": {
+        "role": "primary",
+        "displayName": "Pale",
+        "tonalRamp": [
+          "oklch(15% 0.0149 260.73)",
+          "oklch(26% 0.0149 260.73)",
+          "oklch(38% 0.0149 260.73)",
+          "oklch(49% 0.0149 260.73)",
+          "oklch(61% 0.0149 260.73)",
+          "oklch(72% 0.0149 260.73)",
+          "oklch(84% 0.0149 260.73)",
+          "oklch(95% 0.0149 260.73)"
+        ]
+      },
+      "surface": {
+        "role": "neutral",
+        "displayName": "Surface",
+        "tonalRamp": [
+          "oklch(15% 0.0000 89.88)",
+          "oklch(26% 0.0000 89.88)",
+          "oklch(38% 0.0000 89.88)",
+          "oklch(49% 0.0000 89.88)",
+          "oklch(61% 0.0000 89.88)",
+          "oklch(72% 0.0000 89.88)",
+          "oklch(84% 0.0000 89.88)",
+          "oklch(95% 0.0000 89.88)"
+        ]
+      },
+      "canvas": {
+        "role": "neutral",
+        "displayName": "Canvas",
+        "tonalRamp": [
+          "oklch(15% 0.0034 247.86)",
+          "oklch(26% 0.0034 247.86)",
+          "oklch(38% 0.0034 247.86)",
+          "oklch(49% 0.0034 247.86)",
+          "oklch(61% 0.0034 247.86)",
+          "oklch(72% 0.0034 247.86)",
+          "oklch(84% 0.0034 247.86)",
+          "oklch(95% 0.0034 247.86)"
+        ]
+      },
+      "inset": {
+        "role": "neutral",
+        "displayName": "Inset",
+        "tonalRamp": [
+          "oklch(15% 0.0045 258.32)",
+          "oklch(26% 0.0045 258.32)",
+          "oklch(38% 0.0045 258.32)",
+          "oklch(49% 0.0045 258.32)",
+          "oklch(61% 0.0045 258.32)",
+          "oklch(72% 0.0045 258.32)",
+          "oklch(84% 0.0045 258.32)",
+          "oklch(95% 0.0045 258.32)"
+        ]
+      },
+      "field-border": {
+        "role": "neutral",
+        "displayName": "Field Border",
+        "tonalRamp": [
+          "oklch(15% 0.0158 248.01)",
+          "oklch(26% 0.0158 248.01)",
+          "oklch(38% 0.0158 248.01)",
+          "oklch(49% 0.0158 248.01)",
+          "oklch(61% 0.0158 248.01)",
+          "oklch(72% 0.0158 248.01)",
+          "oklch(84% 0.0158 248.01)",
+          "oklch(95% 0.0158 248.01)"
+        ]
+      },
+      "secondary-ink": {
+        "role": "neutral",
+        "displayName": "Secondary Ink",
+        "tonalRamp": [
+          "oklch(15% 0.0432 251.43)",
+          "oklch(26% 0.0432 251.43)",
+          "oklch(38% 0.0432 251.43)",
+          "oklch(49% 0.0432 251.43)",
+          "oklch(61% 0.0432 251.43)",
+          "oklch(72% 0.0432 251.43)",
+          "oklch(84% 0.0432 251.43)",
+          "oklch(95% 0.0432 251.43)"
+        ]
+      },
+      "secondary-border": {
+        "role": "neutral",
+        "displayName": "Secondary Border",
+        "tonalRamp": [
+          "oklch(15% 0.0164 245.10)",
+          "oklch(26% 0.0164 245.10)",
+          "oklch(38% 0.0164 245.10)",
+          "oklch(49% 0.0164 245.10)",
+          "oklch(61% 0.0164 245.10)",
+          "oklch(72% 0.0164 245.10)",
+          "oklch(84% 0.0164 245.10)",
+          "oklch(95% 0.0164 245.10)"
+        ]
+      },
+      "secondary-hover": {
+        "role": "neutral",
+        "displayName": "Secondary Hover",
+        "tonalRamp": [
+          "oklch(15% 0.0086 247.91)",
+          "oklch(26% 0.0086 247.91)",
+          "oklch(38% 0.0086 247.91)",
+          "oklch(49% 0.0086 247.91)",
+          "oklch(61% 0.0086 247.91)",
+          "oklch(72% 0.0086 247.91)",
+          "oklch(84% 0.0086 247.91)",
+          "oklch(95% 0.0086 247.91)"
+        ]
+      },
+      "easy": {
+        "role": "secondary",
+        "displayName": "Easy",
+        "tonalRamp": [
+          "oklch(15% 0.0674 169.18)",
+          "oklch(26% 0.0674 169.18)",
+          "oklch(38% 0.0674 169.18)",
+          "oklch(49% 0.0674 169.18)",
+          "oklch(61% 0.0674 169.18)",
+          "oklch(72% 0.0674 169.18)",
+          "oklch(84% 0.0674 169.18)",
+          "oklch(95% 0.0674 169.18)"
+        ]
+      },
+      "moderate": {
+        "role": "secondary",
+        "displayName": "Moderate",
+        "tonalRamp": [
+          "oklch(15% 0.0926 74.92)",
+          "oklch(26% 0.0926 74.92)",
+          "oklch(38% 0.0926 74.92)",
+          "oklch(49% 0.0926 74.92)",
+          "oklch(61% 0.0926 74.92)",
+          "oklch(72% 0.0926 74.92)",
+          "oklch(84% 0.0926 74.92)",
+          "oklch(95% 0.0926 74.92)"
+        ]
+      },
+      "challenging": {
+        "role": "secondary",
+        "displayName": "Challenging",
+        "tonalRamp": [
+          "oklch(15% 0.1097 26.67)",
+          "oklch(26% 0.1097 26.67)",
+          "oklch(38% 0.1097 26.67)",
+          "oklch(49% 0.1097 26.67)",
+          "oklch(61% 0.1097 26.67)",
+          "oklch(72% 0.1097 26.67)",
+          "oklch(84% 0.1097 26.67)",
+          "oklch(95% 0.1097 26.67)"
+        ]
+      }
+    },
+    "typographyMeta": {
+      "display": {
+        "displayName": "Display",
+        "purpose": "Planner task heading; 26px desktop, 24px mobile."
+      },
+      "headline": {
+        "displayName": "Headline",
+        "purpose": "Base page heading; surface-specific sizes described in DESIGN.md."
+      },
+      "title": {
+        "displayName": "Title",
+        "purpose": "Base section heading."
+      },
+      "body": {
+        "displayName": "Body",
+        "purpose": "Root text and paragraph rhythm."
+      },
+      "label": {
+        "displayName": "Label",
+        "purpose": "Field labels and contextual actions."
+      },
+      "metric": {
+        "displayName": "Metric",
+        "purpose": "32px plotted distance with tabular numerals and smaller units."
+      }
+    },
+    "shadows": [
+      {
+        "name": "ambient-feedback",
+        "value": "0 8px 32px #2033451a",
+        "purpose": "Toast and area menu"
+      },
+      {
+        "name": "map-controls",
+        "value": "0 2px 12px #243b4826",
+        "purpose": "Map control stack"
+      },
+      {
+        "name": "map-actions",
+        "value": "0 2px 10px #243b4820",
+        "purpose": "Basemap and search-area actions"
+      },
+      {
+        "name": "drawing-actions",
+        "value": "0 3px 14px #243b4830",
+        "purpose": "Placement and undo"
+      },
+      {
+        "name": "field-focus",
+        "value": "0 0 0 3px #2465d814",
+        "purpose": "Field focus halo"
+      }
+    ],
+    "motion": [
+      {
+        "name": "action-transition",
+        "value": "background 0.15s ease",
+        "purpose": "Primary and secondary hover"
+      },
+      {
+        "name": "first-save-trace",
+        "value": "750ms cubic-bezier(0.2, 0.8, 0.2, 1)",
+        "purpose": "Reveal actual saved day polylines; disabled with prefers-reduced-motion."
+      }
+    ],
+    "breakpoints": [
+      {
+        "name": "compact-desktop",
+        "value": "1100px"
+      },
+      {
+        "name": "mobile",
+        "value": "800px"
+      },
+      {
+        "name": "small-phone",
+        "value": "480px"
+      }
+    ]
+  },
+  "components": [
+    {
+      "name": "Primary action",
+      "kind": "button",
+      "refersTo": "button-primary",
+      "description": "The main action within a planning group.",
+      "html": "<button class=\"ds-primary\">Find a route</button>",
+      "css": ".ds-primary{font-family:Inter,ui-sans-serif,system-ui,sans-serif;cursor:pointer;display:inline-flex;align-items:center;justify-content:center;gap:9px;font-size:13px;font-weight:600;border-radius:9px;min-height:42px;padding:12px 17px;line-height:1.2;transition:background .15s ease;border:0;background:var(--blue,#2465d8);color:#fff}.ds-primary:hover{background:var(--blue-deep,#174ca9)}.ds-primary:focus-visible{outline:3px solid var(--blue,#2465d8);outline-offset:4px}.ds-primary:disabled{opacity:.6;cursor:not-allowed}@media(prefers-reduced-motion:reduce){.ds-primary{transition:none}}@media(max-width:800px){.ds-primary{min-height:44px;}}"
+    },
+    {
+      "name": "Secondary action",
+      "kind": "button",
+      "refersTo": "button-secondary",
+      "description": "An outlined alternative action.",
+      "html": "<button class=\"ds-secondary\">Open plan</button>",
+      "css": ".ds-secondary{font-family:Inter,ui-sans-serif,system-ui,sans-serif;cursor:pointer;display:inline-flex;align-items:center;justify-content:center;gap:9px;font-size:13px;font-weight:600;border-radius:9px;min-height:42px;padding:12px 17px;line-height:1.2;transition:background .15s ease;background:#fff;border:1px solid #d5dfe8;color:#34475c}.ds-secondary:hover{background:#f0f5fa}.ds-secondary:focus-visible{outline:3px solid var(--blue,#2465d8);outline-offset:4px}@media(prefers-reduced-motion:reduce){.ds-secondary{transition:none}}@media(max-width:800px){.ds-secondary{min-height:44px;}}"
+    },
+    {
+      "name": "Text action",
+      "kind": "button",
+      "refersTo": "button-text",
+      "description": "A light contextual action.",
+      "html": "<button class=\"ds-text\">Edit profile</button>",
+      "css": ".ds-text{font-family:Inter,ui-sans-serif,system-ui,sans-serif;cursor:pointer;display:inline-flex;align-items:center;gap:6px;background:transparent;border:0;color:var(--blue,#2465d8);font-weight:500;font-size:12px;padding:2px 0}.ds-text:hover{text-decoration:underline}.ds-text:focus-visible{outline:3px solid var(--blue,#2465d8);outline-offset:4px}@media(max-width:800px){.ds-text{min-height:44px;}}"
+    },
+    {
+      "name": "Icon action",
+      "kind": "button",
+      "refersTo": "button-icon",
+      "description": "A compact action with an accessible name.",
+      "html": "<button class=\"ds-icon\" aria-label=\"Remove item\"><svg width=\"18\" height=\"18\" viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"1.8\" stroke-linecap=\"round\"><path d=\"M18 6 6 18M6 6l12 12\"/></svg></button>",
+      "css": ".ds-icon{font-family:Inter,ui-sans-serif,system-ui,sans-serif;cursor:pointer;display:inline-flex;align-items:center;justify-content:center;min-width:34px;min-height:34px;border:0;background:transparent;border-radius:7px;color:var(--muted,#606e7d)}.ds-icon:hover{background:#eaf0f5}.ds-icon:focus-visible{outline:3px solid var(--blue,#2465d8);outline-offset:4px}@media(max-width:800px){.ds-icon{min-height:44px;min-width:44px;}}"
+    },
+    {
+      "name": "Setup text field",
+      "kind": "input",
+      "refersTo": "setup-field",
+      "description": "A labeled 16px field shared by onboarding and email account forms.",
+      "html": "<label class=\"ds-label\">Home location<input class=\"ds-field\" placeholder=\"Your usual launch area\"></label>",
+      "css": ".ds-label{font-family:Inter,ui-sans-serif,system-ui,sans-serif;display:flex;flex-direction:column;gap:8px;font-size:12px;font-weight:500;color:var(--ink,#202b38)}.ds-field{font:inherit;min-width:0;border:1px solid #cfd8e1;background:white;border-radius:8px;color:var(--ink,#202b38);padding:11px 12px;outline:none;caret-color:var(--blue,#2465d8)}.ds-field::placeholder{color:#667483;opacity:1}.ds-field:focus{border-color:var(--blue,#2465d8);box-shadow:0 0 0 3px #2465d814}.ds-label{font-size:13px}.ds-field{font-size:16px;min-height:48px}"
+    },
+    {
+      "name": "Profile sheet",
+      "kind": "card",
+      "refersTo": "profile-sheet",
+      "description": "A flat content group on the cool page canvas.",
+      "html": "<section class=\"ds-sheet\"><h2>Your paddling profile</h2><p>A little context for your next plan.</p></section>",
+      "css": ".ds-sheet{font-family:Inter,ui-sans-serif,system-ui,sans-serif;color:var(--ink,#202b38);background:white;border:1px solid var(--line,#e1e7ed);border-radius:14px;padding:27px}.ds-sheet h2{font-size:18px;font-weight:600;letter-spacing:-.025em;line-height:1.4;margin:0 0 20px}.ds-sheet p{font-size:12px;line-height:1.65;color:var(--muted,#606e7d);margin:0 0 22px}"
+    },
+    {
+      "name": "Place filter",
+      "kind": "chip",
+      "refersTo": "place-filter",
+      "description": "Selected map-place category.",
+      "html": "<button class=\"ds-filter\" aria-pressed=\"true\">Camping</button>",
+      "css": ".ds-filter{font:500 12px Inter,sans-serif;min-height:44px;padding:9px 10px;border:1px solid #b8cff4;border-radius:8px;background:var(--pale);color:var(--blue-deep);cursor:pointer}.ds-filter:focus-visible{outline:3px solid #2465d8;outline-offset:4px}"
+    },
+    {
+      "name": "Day choice",
+      "kind": "chip",
+      "refersTo": "day-tab",
+      "description": "Independent plotted day.",
+      "html": "<button class=\"ds-day\" aria-pressed=\"true\">Day 1</button>",
+      "css": ".ds-day{font:500 13px Inter,sans-serif;min-height:42px;min-width:44px;padding:9px 12px;border:0;border-radius:7px;background:var(--ink);color:white;cursor:pointer}.ds-day:focus-visible{outline:3px solid #2465d8;outline-offset:4px}"
+    },
+    {
+      "name": "Navigation",
+      "kind": "nav",
+      "refersTo": "navigation-link",
+      "description": "Three destinations; account lives separately in the header.",
+      "html": "<nav class=\"ds-nav\" aria-label=\"Main navigation\"><a href=\"#explore\" aria-current=\"page\">Explore</a><a href=\"#saved\">Saved</a><a href=\"#profile\">Profile</a></nav>",
+      "css": ".ds-nav{display:flex;gap:36px;background:white;min-height:64px}.ds-nav a{position:relative;display:flex;align-items:center;padding:0 3px;color:#657285;text-decoration:none;font:500 13px Inter,sans-serif}.ds-nav a:hover,.ds-nav a[aria-current]{color:var(--blue)}.ds-nav a[aria-current]:after{content:\"\";position:absolute;bottom:0;left:0;right:0;height:3px;background:var(--blue)}.ds-nav a:focus-visible{outline:3px solid #2465d8;outline-offset:4px}"
+    },
+    {
+      "name": "Setup sheet",
+      "kind": "card",
+      "refersTo": "setup-sheet",
+      "description": "Two-step Home and Experience setup.",
+      "html": "<section class=\"ds-setup\"><ol><li>1 Home</li><li>2 Experience</li></ol><h2>Good days start close to home.</h2><p>A town or approximate area is enough.</p></section>",
+      "css": ".ds-setup{font-family:Inter,sans-serif;background:var(--surface);border:1px solid var(--line);border-radius:20px;padding:36px 40px;color:var(--ink);max-width:640px}.ds-setup ol{display:flex;gap:24px;list-style:none;padding:0;font-size:12px;color:var(--blue-deep)}.ds-setup h2{font-size:32px;font-weight:600;letter-spacing:-.035em;line-height:1.2}.ds-setup p{color:var(--muted);font-size:14px;line-height:1.65}"
+    }
+  ],
+  "narrative": {
+    "northStar": "The Map and the Planning Sheet",
+    "overview": "Solvaa pairs a working geographic canvas with calm white planning sheets. The user-pinned Slopes reference supplies map prominence, clear activity statistics, restrained controls and straightforward navigation. Cool slate text, functional accents and fine rules organize a compact workspace.\n\nThis is a descriptive refresh of the existing web system after the map-first refinement, not a new world or approved visual comp. The incumbent North Star and Inter identity remain. No retrospective concept seed or QUALITY BAR card is claimed. The build takes precedence over provisional direction measurements and color names.",
+    "keyCharacteristics": [
+      "Geography stays prominent while details appear when needed.",
+      "White sheets and fine dividers group practical information.",
+      "Functional color connects actions, selection and user-drawn geometry.",
+      "Tabular statistics and SVG line icons support quick reading."
+    ],
+    "rules": [
+      {
+        "name": "The Functional Color Rule",
+        "body": "Use the accent for action, selection and the person\u2019s line. A line color never certifies a navigable route.",
+        "section": "colors"
+      },
+      {
+        "name": "The One Family Rule",
+        "body": "Keep Inter, weight 600 headings and weight 500 tabular metrics.",
+        "section": "typography"
+      },
+      {
+        "name": "The Floating Sheet Rule",
+        "body": "Reserve soft elevation for controls over geography and transient feedback.",
+        "section": "elevation"
+      }
+    ],
+    "dos": [
+      "retain Inter, labeled SVG icons, fine rules and clear statistical units.",
+      "keep map attribution, place sources and manual-line limitations visible.",
+      "preserve the mobile map-before-panel order and space for bottom navigation.",
+      "preserve keyboard focus, readable mobile fields and reduced-motion handling.",
+      "celebrate the saved line and describe local versus synchronized data honestly."
+    ],
+    "donts": [
+      "imply that straight segments or approximate launch points are validated navigation.",
+      "join separate days with an invented transfer line.",
+      "treat photos or distance as evidence of certified technical competence.",
+      "reintroduce generated catalog routes into active place finding."
+    ]
+  }
+}

@@ -1,0 +1,7 @@
+const test=require('node:test');
+const assert=require('node:assert/strict');
+process.env.AUTH_REQUIRED='true';
+const app=require('../src/index');
+const {mapPlaces}=require('../src/routes/mapPoints');
+test('production gate covers map, onboarding, planning and workspace while config remains public',async t=>{const server=app.listen(0,'127.0.0.1');await new Promise(r=>server.once('listening',r));t.after(()=>new Promise(r=>server.close(r)));const base=`http://127.0.0.1:${server.address().port}`;for(const path of ['/api/explore/points?lat=57&lon=-6','/api/onboarding/locations?q=Portree','/api/planning/photos','/api/account/workspace']){assert.equal((await fetch(base+path)).status,401,path);}const config=await(await fetch(base+'/api/config')).json();assert.equal(config.authRequired,true);assert.equal(Object.keys(config).some(k=>/secret|service.role/i.test(k)),false);});
+test('map points are sourced coordinates, exclude private access, and do not invent locations',()=>{const points=mapPlaces([{type:'node',id:1,lat:0,lon:0,tags:{leisure:'slipway'}},{type:'node',id:2,lat:57,lon:-6,tags:{amenity:'cafe',name:'Private café',access:'private'}},{type:'way',id:3,center:{lat:57,lon:-6},tags:{tourism:'camp_site',name:'Camp'}},{type:'way',id:4,tags:{tourism:'hotel',name:'No location'}}]);assert.equal(points.length,2);assert.equal(points[0].lat,0);assert.equal(points[0].type,'launch');assert.equal(points[1].type,'camp');assert.equal(points[1].url,'https://www.openstreetmap.org/way/3');});

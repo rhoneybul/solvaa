@@ -67,3 +67,9 @@ android/build/
 local.properties
 
 .env.local
+
+# Local design-review captures and browser QA fixtures
+.impeccable/review/
+
+.vercel/
+.impeccable/*-before-review.png

@@ -1,18 +1,15 @@
 services:
   - type: web
-    name: solvaa-api
+    name: solvaa
     runtime: node
-    rootDir: server
-    buildCommand: npm install
+    plan: free
+    healthCheckPath: /health
+    buildCommand: npm ci --include=dev && npm --prefix server ci --omit=dev && npm run build
     startCommand: npm start
     envVars:
       - key: NODE_ENV
         value: production
-      - key: SUPABASE_URL
-        sync: false
-      - key: SUPABASE_ANON_KEY
-        sync: false
-      - key: SUPABASE_SERVICE_ROLE_KEY
-        sync: false
-      - key: RIDB_API_KEY
-        sync: false
+      - key: NODE_VERSION
+        value: 22
+      - key: AI_ENABLED
+        value: "false"

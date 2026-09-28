@@ -1,45 +1,15 @@
-<!DOCTYPE html>
+<!doctype html>
 <html lang="en">
   <head>
-    <meta charset="utf-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
-
-    <title>Paddle</title>
-    <meta name="description" content="Know the water before you go — AI-powered kayak trip planning" />
-
-    <!-- PWA -->
-    <link rel="manifest" href="/manifest.json" />
-    <meta name="theme-color" content="#3a6a4a" />
-    <meta name="mobile-web-app-capable" content="yes" />
-    <meta name="apple-mobile-web-app-capable" content="yes" />
-    <meta name="apple-mobile-web-app-status-bar-style" content="default" />
-    <meta name="apple-mobile-web-app-title" content="Paddle" />
-
-    <!-- Icons -->
-    <link rel="icon" type="image/png" href="/assets/favicon.png" />
-    <link rel="apple-touch-icon" href="/assets/icon.png" />
-
-    <!-- Prevent flash of unstyled content -->
-    <style>
-      html, body { margin: 0; padding: 0; background: #f2f1ed; height: 100%; }
-      #root { height: 100%; }
-    </style>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="theme-color" content="#f5f7f9" />
+    <meta name="description" content="Find launch areas, plot your own paddle, and save a day out or a multi-day adventure. Build a profile from your own experience." />
+    <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+    <title>Solvaa — find your next paddle</title>
   </head>
   <body>
     <div id="root"></div>
-    <%- helmet.htmlAttributes.toString() %>
-    <%- helmet.title.toString() %>
-    <%- helmet.meta.toString() %>
-    <%- helmet.link.toString() %>
-    <%- helmet.script.toString() %>
-
-    <script>
-      if ('serviceWorker' in navigator) {
-        window.addEventListener('load', () => {
-          navigator.serviceWorker.register('/service-worker.js')
-            .catch(err => console.warn('SW registration failed:', err));
-        });
-      }
-    </script>
+    <script type="module" src="/src/main.jsx"></script>
   </body>
 </html>

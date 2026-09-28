@@ -3,6 +3,19 @@ const router = express.Router();
 const { supabase } = require('../lib/supabase');
 const { refineRouteWaypoints } = require('../lib/waterRouting');
 
+const { authMiddleware } = require('../middleware/auth');
+const { createAiGuard } = require('../lib/ai');
+// Photo lookup is public and free. Every paid legacy endpoint shares one durable budget.
+router.use((req, res, next) => {
+  if (req.method !== 'POST' || req.path === '/photos') return next();
+  if (req.path === '/') return res.status(422).json({
+    error: 'AI-generated navigation coordinates are disabled until a water-only routing provider is configured. Use planning outlines for exploration, not navigation.',
+  });
+  if (JSON.stringify(req.body || {}).length > 18000)
+    return res.status(413).json({ error: 'Keep the AI request shorter.' });
+  authMiddleware(req, res, () => createAiGuard()(req, res, next));
+});
+
 // Claude API service — moved from frontend to avoid CORS
 const CLAUDE_API_KEY = process.env.CLAUDE_API_KEY || '';
 
@@ -123,31 +136,9 @@ For every coordinate you generate, ask yourself: "If I plotted this on Google Ma
 Always prioritize safety and realistic planning.`;
 
 async function callClaudeAPI(messages, systemPrompt) {
-  const response = await fetch('https://api.anthropic.com/v1/messages', {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-      'x-api-key': CLAUDE_API_KEY,
-      'anthropic-version': '2023-06-01',
-    },
-    body: JSON.stringify({
-      model: 'claude-sonnet-4-6',
-      max_tokens: 4096,
-      system: systemPrompt,
-      messages: messages,
-    }),
-  });
-
-  if (!response.ok) {
-    const errBody = await response.json().catch(() => ({}));
-    throw new Error(`Claude API error: ${response.status} — ${errBody?.error?.message || response.statusText}`);
-  }
-
-  const data = await response.json();
-  if (data.stop_reason === 'max_tokens') {
-    console.warn('Claude response truncated (max_tokens reached) — JSON may be incomplete');
-  }
-  return data.content[0].text;
+  if (JSON.stringify(messages).length > 12000 || String(systemPrompt).length > 6000)
+    throw new Error('Keep the AI request shorter.');
+  return require('../lib/ai').callAi(systemPrompt, messages);
 }
 
 /** Attempt to repair common JSON defects: trailing commas, truncated brackets/strings. */
@@ -439,130 +430,15 @@ Focus on safety-relevant details. If the question is outside your knowledge, say
   }
 });
 
-// POST /api/planning/photos — ask Claude for relevant Wikipedia articles then fetch their thumbnails
-router.post('/photos', async (req, res) => {
+// Coordinate-grounded photos with attribution; no generated landmark guesses.
+router.post('/photos', async (req, res, next) => {
   try {
     const { route } = req.body;
-    if (!route) return res.status(400).json({ error: 'route is required' });
-
-    // Extract sampled waypoint coordinates from the route
-    const rawWaypoints = Array.isArray(route.waypoints) ? route.waypoints : [];
-    const wpts = rawWaypoints
-      .map(w => (Array.isArray(w) ? { lat: w[0], lon: w[1] } : w))
-      .filter(w => w?.lat != null && w?.lon != null);
-
-    // Sample start, mid, end — or fall back to locationCoords
-    const sampleCoords = [];
-    if (wpts.length >= 2) {
-      const pts = [wpts[0], wpts[Math.floor(wpts.length / 2)], wpts[wpts.length - 1]];
-      for (const pt of pts) {
-        if (!sampleCoords.find(c => c.lat === pt.lat && c.lon === pt.lon)) {
-          sampleCoords.push(pt);
-        }
-      }
-    } else if (wpts.length === 1) {
-      sampleCoords.push(wpts[0]);
-    } else if (route.locationCoords?.lat) {
-      sampleCoords.push({
-        lat: route.locationCoords.lat,
-        lon: route.locationCoords.lng ?? route.locationCoords.lon,
-      });
+    if (!route || !Array.isArray(route.waypoints) || route.waypoints.length > 1000) {
+      return res.status(400).json({ error: 'A route with up to 1000 waypoints is required.' });
     }
-
-    const coordList = sampleCoords
-      .map((c, i) => {
-        const label = i === 0 ? 'launch' : i === sampleCoords.length - 1 ? 'finish' : 'midpoint';
-        return `  ${label}: ${c.lat.toFixed(5)}, ${c.lon.toFixed(5)}`;
-      })
-      .join('\n');
-
-    // Ask Claude: what are the kayaking highlights within ~100m of these exact coordinates?
-    // Use those highlight names as Wikimedia Commons search queries.
-    let searchQueries = [];
-
-    if (CLAUDE_API_KEY) {
-      const systemPrompt = `You are a local paddling guide with expert geographic knowledge.
-Given GPS coordinates along a kayak route, identify exactly 3 specific kayaking highlights that a paddler would encounter within approximately 100 metres of those points.
-
-A highlight must be a named, visible feature right on the water: a sea arch, sea stack, cave, tidal race, waterfall into the sea, headland, narrow channel, island, reef, rock formation, beach, cove, or similar.
-Do NOT suggest towns, car parks, pubs, or anything inland.
-Each highlight must be real and verifiable — use your geographic knowledge of the area.
-
-For each highlight, provide a short Wikimedia Commons search query (2–5 words) that will find a photograph of that exact feature.
-
-Respond ONLY with a valid JSON array of 3 strings — each string is the search query. No preamble, no markdown.
-Example for Pembrokeshire: ["Green Bridge of Wales", "Elegug Stacks Pembrokeshire", "St Govan's Head sea"]`;
-
-      const userMessage = `Route: ${route.name || 'Unnamed'} (${route.terrain || 'coastal'})\nWaypoint coordinates:\n${coordList || '  (none)'}`;
-
-      try {
-        const answer = await callClaudeAPI(
-          [{ role: 'user', content: userMessage }],
-          systemPrompt,
-        );
-        const parsed = JSON.parse(answer.replace(/```json?|```/g, '').trim());
-        if (Array.isArray(parsed)) searchQueries = parsed.slice(0, 3);
-      } catch (e) {
-        console.warn('[photos] Claude parse failed:', e.message);
-      }
-    }
-
-    // Fallback search queries
-    if (searchQueries.length === 0) {
-      const base = route.launchPoint || route.name || 'coast';
-      searchQueries = [`${base} kayak`, `${base} sea arch`, `${base} coastline`];
-    }
-
-    // Search Wikimedia Commons for each query and take the best JPEG result
-    const COMMONS = 'https://commons.wikimedia.org/w/api.php';
-    const photos = [];
-
-    await Promise.all(
-      searchQueries.map(async (query) => {
-        try {
-          const params = new URLSearchParams({
-            action:     'query',
-            generator:  'search',
-            gsrsearch:  `filetype:bitmap ${query}`,
-            gsrnamespace: '6',  // File: namespace
-            gsrlimit:   '8',
-            prop:       'imageinfo',
-            iiprop:     'url|dimensions|mime|extmetadata|canonicalurl',
-            iiurlwidth: '800',
-            format:     'json',
-            origin:     '*',
-          });
-          const r = await fetch(`${COMMONS}?${params}`);
-          if (!r.ok) return;
-          const data = await r.json();
-          const pages = Object.values(data?.query?.pages || {});
-
-          // Pick the first landscape-oriented JPEG that's large enough
-          const pick = pages.find(p => {
-            const ii = p.imageinfo?.[0];
-            if (!ii) return false;
-            if (!ii.mime?.startsWith('image/jpeg')) return false;
-            if ((ii.width || 0) < 600 || (ii.height || 0) < 300) return false;
-            // Prefer landscape orientation
-            return (ii.width || 0) >= (ii.height || 0);
-          });
-
-          if (pick) {
-            const ii = pick.imageinfo[0];
-            const url = ii.thumburl || ii.url;
-            const caption = pick.title.replace(/^File:/, '').replace(/\.[^.]+$/, '').replace(/_/g, ' ');
-            const commonsUrl = ii.canonicalurl || `https://commons.wikimedia.org/wiki/${encodeURIComponent(pick.title)}`;
-            photos.push({ url, title: caption, commonsUrl });
-          }
-        } catch { /* skip */ }
-      })
-    );
-
-    res.json({ photos });
-  } catch (error) {
-    console.error('Photos error:', error);
-    res.status(500).json({ error: error.message });
-  }
+    res.json(await require('../lib/routePhotos').fetchRoutePhotos(route));
+  } catch (error) { next(error); }
 });
 
 module.exports = router;
