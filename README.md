@@ -40,13 +40,15 @@ Town search is optional and disabled by default. Home can be pinned on a map or 
 
 ## Deploy on Vercel + Supabase
 
-Follow [the deployment guide](docs/deployment.md). `vercel.json` builds the Vite site and one Express API function. Add Supabase runtime variables, apply migration 003 to the selected project, configure authentication email/redirects, and keep AI disabled initially. No separate Railway or Render backend is required for this deployment.
+Follow [the deployment guide](docs/deployment.md). `vercel.json` builds the Vite site and one Express API function. Add Supabase runtime variables, add its PostgreSQL `DATABASE_URL` for automatic startup migrations, configure authentication email/redirects, and keep AI disabled initially. No separate Railway or Render backend is required for this deployment.
 
 The old live app was found at https://paddle-kayak.vercel.app. Its bundled Supabase reference is `kseznjbmxhpdogrhyjfb`; that hostname did not resolve during the September 28 check. Dashboard access is required to determine whether the project can be restored or must be replaced. No remote migration or environment-variable changes have been applied yet.
 
+The API applies pending web migrations before serving requests, using a transaction lock and a private checksum ledger. Startup failures block the API; existing data and historical native-app migrations are preserved. The [deployment guide](docs/deployment.md#automatic-database-migrations) explains the connection URI, TLS and adding future migrations.
+
 Leave `VITE_API_URL` empty for the single-origin deployment. `/api/config` returns public settings only. Server keys must never use `VITE_` or `EXPO_PUBLIC_` prefixes. The former Expo public Supabase variable names are accepted as migration aliases.
 
-To verify durable quotas against isolated PostgreSQL:
+To verify startup migrations and durable quotas against isolated PostgreSQL:
 
 ```sh
 npm run test:db

@@ -17,6 +17,7 @@ const savedRoutesRouter = require('./routes/savedRoutes');
 const poisRouter        = require('./routes/pois');
 
 const { authMiddleware } = require('./middleware/auth');
+const { ensureDatabaseReady, readinessMiddleware } = require('./lib/migrations');
 
 const app  = express();
 const PORT = process.env.PORT || 3008;
@@ -27,6 +28,8 @@ const allowedOrigins = process.env.ALLOWED_ORIGINS;
 app.use(cors({ origin: !allowedOrigins || allowedOrigins === '*' ? '*' : allowedOrigins.split(',') }));
 // Exact proxy-hop count is deployment-specific; never trust arbitrary forwarded headers.
 app.set('trust proxy', Number(process.env.TRUST_PROXY_HOPS) || false);
+// Vercel cold starts wait here; concurrent requests share one startup promise.
+app.use(readinessMiddleware(ensureDatabaseReady));
 app.use(express.json({ limit: '1100kb' }));
 
 // Public API usage is bounded without requiring an account.
@@ -88,7 +91,12 @@ app.use((err, _req, res, _next) => {
   res.status(err.status || 500).json({ error: err.message || 'Internal server error' });
 });
 
-if (require.main === module) app.listen(PORT, () => {
-  console.log(`Solvaa website and API running on http://localhost:${PORT}`);
-});
+if (require.main === module) {
+  ensureDatabaseReady().then(() => app.listen(PORT, () => {
+    console.log(`Solvaa website and API running on http://localhost:${PORT}`);
+  })).catch(() => {
+    console.error('Database initialization failed. Check DATABASE_URL, database permissions and migration history.');
+    process.exitCode = 1;
+  });
+}
 module.exports = app;

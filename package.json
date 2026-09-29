@@ -11,7 +11,7 @@
     "start": "npm --prefix server start",
     "setup": "npm install && npm --prefix server install",
     "test": "node --test web/test/*.test.mjs server/test/*.test.js",
-    "test:db": "node --test server/test/ai-quota-postgres.integration.js"
+    "test:db": "node --test server/test/*.integration.js"
   },
   "dependencies": {
     "@fontsource/inter": "^5.3.0",

@@ -18,3 +18,6 @@ jobs:
       - run: npm --prefix server ci --omit=dev
       - run: npm test
       - run: npm run build
+      - name: Add PostgreSQL tools to PATH
+        run: echo "$(pg_config --bindir)" >> "$GITHUB_PATH"
+      - run: npm run test:db
