@@ -1,189 +1,70 @@
-# 🛶 Paddle — Kayak Trip Planner
+# Solvaa web
 
-A cross-platform mobile app (iOS, Android, and desktop browser) built with Expo / React Native.
+A mobile-friendly paddling map built with React, Vite and Leaflet. Discover launch areas and useful stops, plot each leg yourself, and save a day out or a multi-day trip. Production uses Supabase email/password authentication; Google login is unnecessary.
 
----
+## Run locally
 
-## Quick Start
+Requires Node 22 and npm.
 
-### Requirements
-- Node.js 18+ (https://nodejs.org)
-- npm 9+
-- Expo Go app on your phone (App Store / Play Store)
-
-### 1. Unzip and install
-
-```bash
-cd ~/Downloads
-unzip paddle-kayak-app.zip -d paddle
-cd paddle
-npm install
+```sh
+npm run setup
+npm run dev
 ```
 
-### 2. Add your Claude API key
+Open http://127.0.0.1:5173. The API runs on port 3008. Local development works without cloud credentials; production always requires sign-in. `SOLVAA_API_PORT` changes both development server and proxy ports.
 
-```bash
-cp .env.example .env
+```sh
+npm test
+npm run build
+NODE_ENV=production npm start
 ```
 
-Open `.env` and paste your key:
-```
-EXPO_PUBLIC_CLAUDE_API_KEY=sk-ant-your-key-here
-```
+## Current experience
 
-Get a free key at **console.anthropic.com** → API Keys → Create Key.
+- Two-step onboarding: home town/approximate map area, experience, optional screenshot or typed session figures. The resulting profile sets estimated paddling pace and comfortable daily distance.
+- Explore launch areas, food, camping and places to stay. Map points cite their source. Supplied launch areas are approximate; live places use Overpass/OpenStreetMap. If the provider fails, launch suggestions and Skye operator-directory links remain available.
+- Plot by tapping the map, dragging points, or moving the map and adding its centre. Zoom controls never add points. A coordinate editor supports keyboard changes. Undo and individual-point removal are available.
+- Add up to 14 days, each with its own points, stops and notes. Separate days never create artificial connecting lines. Every day needs at least two points before saving or exporting.
+- Save, reopen, rename, edit and delete routes. The first save traces the actual route shape. Drafts save on-device; explicit saves synchronize to the account, with revision conflict protection.
+- Import GPX, TCX or Strava activities.csv; add photographs and skill notes. Files stay on the device and photos are re-encoded to remove location metadata. FIT and direct Strava OAuth synchronization are not implemented.
 
-### 3. Run
+## Route confidence and cost controls
 
-**On your phone** (Expo Go app must be installed):
-```bash
-npx expo start
-```
-Scan the QR code with your phone camera (iOS) or the Expo Go app (Android).
-Your phone and laptop must be on the same WiFi network.
+A manually plotted GPX is valid XML, **not proof of a paddleable route**. Straight segments join chosen points and may cross land. Export explicitly states that no water/access/tide validation took place and requires the user to acknowledge this. Earlier generated outlines remain blocked from GPX export; saved outline notes are preserved. The legacy AI coordinate-generation endpoint is disabled. See [water-routing research](docs/water-routing-services.md).
 
-**In your desktop browser:**
-```bash
-npx expo start --web
-```
-Opens at http://localhost:8081 — the app appears as a phone-width column centred on the page.
+Plotting, map discovery and manual onboarding make no AI calls. Optional screenshot reading sends a resized image to Anthropic only with explicit consent and a verified email. AI is off by default. When enabled, all paid endpoints share durable PostgreSQL limits: 3 calls/user/day, 10/user/month, a 60-second cooldown, 10/IP/day, 20/site/day and 100/site/month. Failed calls count; quota errors block paid calls. Output is capped at 768 tokens and paid calls do not retry automatically.
 
-**iOS Simulator** (Mac + Xcode required):
-```bash
-npx expo start --ios
-```
+Account profiles and saved plans sync. Drafts, photos and imported activity records remain in account-separated IndexedDB on the device. Clearing browser data deletes local files. Export profile/session data for a portable copy; image files are not included. Conflicting account changes remain local until the user explicitly resolves them.
 
-**Android Emulator** (Android Studio required):
-```bash
-npx expo start --android
-```
+Town search is optional and disabled by default. Home can be pinned on a map or set from rounded device location. Do not enable public Nominatim on serverless Vercel: its application-wide request limit requires shared coordination that the local development geocoder does not provide.
 
----
+## Deploy on Vercel + Supabase
 
-## Screens
+Follow [the deployment guide](docs/deployment.md). `vercel.json` builds the Vite site and one Express API function. Add Supabase runtime variables, add its PostgreSQL `DATABASE_URL` for automatic startup migrations, configure authentication email/redirects, and keep AI disabled initially. No separate Railway or Render backend is required for this deployment.
 
-| Screen | How to reach it |
-|--------|----------------|
-| Sign In | App opens here |
-| Home | After signing in — map + plan entry |
-| Plan a Paddle (AI) | Home → "Ask AI to plan a paddle" |
-| Trip Setup (manual) | Home → "Plan manually" |
-| Conditions | After trip setup |
-| Routes | After conditions |
-| Campsites | Routes → "View campsites" (multi-day trips) |
-| Live Tracking | Routes → Start Paddle |
-| Emergency / SOS | Tracking → SOS button |
-| History | Home → Past Trips |
+The old live app was found at https://paddle-kayak.vercel.app. Its bundled Supabase reference is `kseznjbmxhpdogrhyjfb`; that hostname did not resolve during the September 28 check. Dashboard access is required to determine whether the project can be restored or must be replaced. No remote migration or environment-variable changes have been applied yet.
 
----
+The API applies pending web migrations before serving requests, using a transaction lock and a private checksum ledger. Startup failures block the API; existing data and historical native-app migrations are preserved. The [deployment guide](docs/deployment.md#automatic-database-migrations) explains the connection URI, TLS and adding future migrations.
 
-## Optional API Keys
+Leave `VITE_API_URL` empty for the single-origin deployment. `/api/config` returns public settings only. Server keys must never use `VITE_` or `EXPO_PUBLIC_` prefixes. The former Expo public Supabase variable names are accepted as migration aliases.
 
-All optional — the app works without them but with reduced functionality.
+To verify startup migrations and durable quotas against isolated PostgreSQL:
 
-### Strava (auto-detect skill level)
-
-1. Go to https://www.strava.com/settings/api
-2. Create an app — set **Authorization Callback Domain** to `localhost`
-3. Add to `.env`:
-```
-EXPO_PUBLIC_STRAVA_CLIENT_ID=your_id
-EXPO_PUBLIC_STRAVA_CLIENT_SECRET=your_secret
-```
-4. Install OAuth packages:
-```bash
-npx expo install expo-web-browser expo-auth-session expo-crypto
+```sh
+npm run test:db
+# Or use a local Docker context:
+SOLVAA_TEST_DOCKER=desktop-linux npm run test:db
 ```
 
-### Recreation.gov / RIDB (US campsite search)
+## Structure
 
-1. Sign up at https://ridb.recreation.gov
-2. Request an API key
-3. Add to `.env`:
-```
-EXPO_PUBLIC_RIDB_API_KEY=your_key
-```
+- `web/src/App.jsx` — navigation, local workspace and account synchronization
+- `web/src/components/MapPlanner.jsx`, `PlotMap.jsx` — map discovery and manual editing
+- `web/src/lib/plotting.mjs` — manual route/day model, validation and GPX
+- `web/src/components/Onboarding.jsx`, `Profile.jsx` — experience and personal evidence
+- `web/src/lib/activities.mjs` — GPX/TCX/CSV normalization
+- `api/index.js` — Vercel function entry point
+- `server/src/routes/mapPoints.js` — sourced place discovery
+- `server/src/routes/account.js`, `server/src/lib/ai.js` — authenticated storage and AI controls
 
-International campsites use OpenStreetMap Overpass — no key needed.
-
----
-
-## Build for distribution
-
-```bash
-npm install -g eas-cli
-eas login
-eas build:configure
-eas build --platform android --profile preview   # free APK
-eas build --platform ios --profile preview       # needs Apple Developer ($99/yr)
-```
-
----
-
-## Troubleshooting
-
-**Phone can't connect / QR code doesn't work**
-→ Make sure phone and laptop are on the same WiFi. Try pressing `e` to send a link by email instead.
-
-**"Unable to resolve module"**
-→ Run `npm install` again, then `npx expo start --clear`
-
-**Web build fails**
-→ Run `npm install react-native-web@~0.20.0 --legacy-peer-deps` then try again
-
-**Claude API not responding**
-→ Check `.env` has the `EXPO_PUBLIC_` prefix. Restart the server after editing `.env`.
-
-**Location not working on iPhone**
-→ Settings → Privacy & Security → Location Services → Expo Go → While Using
-
----
-
-## Project structure
-
-```
-paddle/
-├── App.js                           # Navigation + web wrapper
-├── app.json                         # Expo config + permissions
-├── .env                             # Your API keys (create this)
-├── .env.example                     # Template
-├── src/
-│   ├── screens/
-│   │   ├── SignInScreen.js          # Google + Apple auth
-│   │   ├── HomeScreen.js            # Map + plan entry + nearby dots
-│   │   ├── PlannerScreen.js         # AI natural language planner
-│   │   ├── TripSetupScreen.js       # Manual skill + trip type
-│   │   ├── WeatherScreen.js         # Layered conditions (wind/swell/rain/tide/temp)
-│   │   ├── RoutesScreen.js          # Map + ranked route options
-│   │   ├── CampsitesScreen.js       # RIDB + OSM campsite finder
-│   │   ├── ActivePaddleScreen.js    # GPS tracking + nearby boats + SOS
-│   │   ├── EmergencyScreen.js       # SOS + auto-trigger settings
-│   │   └── HistoryScreen.js         # Past trips log
-│   ├── components/
-│   │   ├── MapSketch.js             # Reusable map component
-│   │   ├── UI.js                    # Shared primitives (cards, buttons, etc.)
-│   │   └── WebWrapper.js            # Desktop browser layout
-│   ├── services/
-│   │   ├── claudeService.js         # Claude API — AI trip planning
-│   │   ├── weatherService.js        # Open-Meteo API + offline cache
-│   │   ├── routeService.js          # Kayaking knowledge engine
-│   │   ├── stravaService.js         # OAuth + skill inference
-│   │   └── storageService.js        # AsyncStorage persistence
-│   └── theme/
-│       └── index.js                 # Colours, font weights, layout helpers
-```
-
----
-
-## What the AI planner understands
-
-Type anything natural, for example:
-
-- *"I'm in Axminster and want to go for a day paddle tomorrow for about 2 hours"*
-- *"I'm in London with a car — where can I go for a day paddle?"*
-- *"Planning a weekend trip, want to kayak and camp. Based in Bristol"*
-- *"I want to plan a week-long kayak expedition from the Scottish Highlands"*
-- *"I'm near Sydney, complete beginner, want a gentle 2-hour paddle"*
-
-Claude returns: real place names, specific launch points, travel times, tide/wind advice, difficulty, packing list, campsite suggestions for multi-day trips, and safety notes.
-
+The old Expo entry points and `src/` remain historical source outside the active build. Retained legacy APIs require authentication in production. The visual reference is [Slopes on Mobbin](https://mobbin.com/screens/0ddf1eea-3635-4650-bb1b-2c20aefe8460).
